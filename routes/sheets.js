@@ -1,6 +1,14 @@
 const express = require('express');
-const { readSheet } = require('../services/sheetsService');
+const { readSheet, writeToSheet } = require('../services/sheetsService');
+const { google } = require('googleapis');
+const path = require('path');
 const router = express.Router();
+const auth = new google.auth.GoogleAuth({
+    keyFile: path.resolve(__dirname, '../config/google.json'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
+});
+
+const spreadsheetId = process.env.SPREADSHEET_ID;
 
 // GET route to fetch data for a specific sheet
 router.get('/:sheetName', async (req, res, next) => {
@@ -17,16 +25,57 @@ router.get('/:sheetName', async (req, res, next) => {
 
         // Define a map between query parameters and sheet column names
         const filters = {
-            sport: 'sport',
             eventId: 'event_id',
+
             ticketId: 'ticket_id',
+            ticketQuantity: 'ticket_quantity',
+            ticketPrice: 'ticket_price',
+
             packageId: 'package_id',
             hotelId: 'hotel_id',
             roomId: 'room_id',
+            roomCheckIn: 'room_check_in',
+            roomCheckOut: 'room_check_out',
+            roomQuantity: 'room_quantity',
+            roomPrice: 'room_price',
+
             airportTransferId: 'airport_transfer_id',
+            airportTransferQuantity: 'airport_transfer_quantity',
+            airportTransferPrice: 'airport_transfer_price',
+
             circuitTransferId: 'circuit_transfer_id',
+            circuitTransferQuantity: 'circuit_transfer_quantity',
+            circuitTransferPrice: 'circuit_transfer_price',
+
+            flightId: 'flight_id',
+            flightBookingReference: 'flight_booking_reference',
+            ticketingDeadline: 'ticketing_deadline',
+            flightStatus: 'flight_status',
+            flightPrice: 'flight_price',
+
             loungePassId: 'lounge_pass_id',
-            packageType: 'package_type',
+            loungePassQuantity: 'lounge_pass_quantity',
+            loungePassPrice: 'lounge_pass_price',
+
+            bookerName: 'booker_name',
+            bookerEmail: 'booker_email',
+            bookerPhone: 'booker_phone',
+            bookerAddress: 'booker_address',
+            leadTravellerName: 'lead_traveller_name',
+            leadTravellerEmail: 'lead_traveller_email',
+            leadTravellerPhone: 'lead_traveller_phone',
+
+            bookingDate: 'booking_date',
+            aquisition: 'aquisition',
+            atolAbtot: 'atol_abtot',
+            ticketingDeadline: 'ticketing_deadline',
+            paymentCurrency: 'payment_currency',
+            payment1: 'payment_1',
+            payment1Date: 'payment_1_date',
+            payment2: 'payment_2',
+            payment2Date: 'payment_2_date',
+            payment3: 'payment_3',
+            payment3Date: 'payment_3_date',
         };
 
         // Apply filters dynamically
@@ -61,79 +110,115 @@ router.get('/:sheetName', async (req, res, next) => {
 router.post('/:sheetName', async (req, res, next) => {
     const { sheetName } = req.params;
     const {
-        "Booker Name" : booker_name,
-        "Booker Email" : booker_email,
-        "Booker Phone" : booker_phone,
-        "Booker Address" : booker_address,
-        "Lead Traveller Name" : lead_traveller_name,
-        "Lead Traveller Email" : lead_traveller_email,
-        "Lead Traveller Phone" : lead_traveller_phone,
-        "All Travellers" : all_travellers,
-        "Adults" : adults,
-        "Booking Date" : booking_date,
-        "Event ID" : event_id,
-        "Package ID": package_id,
-
-        "Ticket ID" : ticket_id,
-        "Ticket Quantity": ticket_quantity,
-        "Ticket Price" : ticket_price,
-
-        "Hotel ID": hotel_id,
-        "Room ID": room_id,
-        "Room Quantity" : room_quantity,
-        "Nights" : nights,
-        "Hotel Room Price" : hotel_room_price,
-        "Extra Night Price" : extra_night_price,
-
-        "Circuit Transfer ID": circuit_transfer_id,
-        "Circuit Transfer Quantity": circuit_transfer_quantity,
-
-        "Airport Transfer ID": airport_transfer_id,
-        "Airport Transfer Quantity": airport_transfer_quantity,
-
-        "Outbound Flight": outbound_flight,
-        "Inbound Flight": inbound_flight,
-        "Flight Class" : flight_class,
-        "Flight Carrier" : flight_carrier,
-        "Flight PNR" : flight_pnr,
-        "Ticketing Deadline" : ticketing_deadline,
-        "Lounge Pass" : lounge_pass,
-        "Lounge Pass Booking Reference" : lounge_pass_booking_reference,
-
-        "Payment Currency": payment_currency,
-        "Total Amount due" : total_amount_due,
+        booker_name,
+        booker_email,
+        booker_phone,
+        booker_address,
+        lead_traveller_name,
+        lead_traveller_email,
+        lead_traveller_phone,
+        guest_traveller_names,
+        booking_date,
+        event_id,
+        package_id,
+        ticket_id,
+        ticket_quantity,
+        ticket_price,
+        hotel_id,
+        room_id,
+        room_quantity,
+        room_price,
+        airport_transfer_id,
+        airport_transfer_quantity,
+        airport_transfer_price,
+        circuit_transfer_id,
+        circuit_transfer_quantity,
+        circuit_transfer_price,
+        flight_id,
+        flight_booking_reference,
+        ticketing_deadline,
+        flight_status,
+        flight_price,
+        lounge_pass_id,
+        lounge_pass_quantity,
+        lounge_pass_price,
+        payment_currency,
+        payment_1,
+        payment_1_date,
+        payment_2,
+        payment_2_date,
+        payment_3,
+        payment_3_date
     } = req.body;
 
-    // Validate that all required fields are present
-    if (
-        !booking_name ||
-        !booking_phone ||
-        !booking_email ||
-        !booking_address ||
-        !ticket_name ||
-        !ticket_id ||
-        !sale_price ||
-        !currency_code ||
-        !quantity ||
-        !invoice_reference
-    ) {
-        return res.status(400).json({ error: 'Missing required fields' });
-    }
+    // Define the field mappings (now they match exactly with the sheet headers)
+    const fieldMappings = {
+        booker_name: 'booker_name',
+        booker_email: 'booker_email',
+        booker_phone: 'booker_phone',
+        booker_address: 'booker_address',
+        lead_traveller_name: 'lead_traveller_name',
+        lead_traveller_email: 'lead_traveller_email',
+        lead_traveller_phone: 'lead_traveller_phone',
+        guest_traveller_names: 'guest_traveller_names',
+        booking_date: 'booking_date',
+        event_id: 'event_id',
+        package_id: 'package_id',
+        ticket_id: 'ticket_id',
+        ticket_quantity: 'ticket_quantity',
+        ticket_price: 'ticket_price',
+        hotel_id: 'hotel_id',
+        room_id: 'room_id',
+        room_quantity: 'room_quantity',
+        room_price: 'room_price',
+        airport_transfer_id: 'airport_transfer_id',
+        airport_transfer_quantity: 'airport_transfer_quantity',
+        airport_transfer_price: 'airport_transfer_price',
+        circuit_transfer_id: 'circuit_transfer_id',
+        circuit_transfer_quantity: 'circuit_transfer_quantity',
+        circuit_transfer_price: 'circuit_transfer_price',
+        flight_id: 'flight_id',
+        flight_booking_reference: 'flight_booking_reference',
+        ticketing_deadline: 'ticketing_deadline',
+        flight_status: 'flight_status',
+        flight_price: 'flight_price',
+        lounge_pass_id: 'lounge_pass_id',
+        lounge_pass_quantity: 'lounge_pass_quantity',
+        lounge_pass_price: 'lounge_pass_price',
+        payment_currency: 'payment_currency',
+        payment_1: 'payment_1',
+        payment_1_date: 'payment_1_date',
+        payment_2: 'payment_2',
+        payment_2_date: 'payment_2_date',
+        payment_3: 'payment_3',
+        payment_3_date: 'payment_3_date'
+    };
 
     try {
-        // Construct the row to write into the sheet
-        const rowData = [
-            booking_name,
-            booking_phone,
-            booking_email,
-            booking_address,
-            ticket_name,
-            ticket_id,
-            sale_price,
-            currency_code,
-            quantity,
-            invoice_reference,
-        ];
+        // First, get the headers from the sheet to ensure correct order
+        const sheets = google.sheets({ version: 'v4', auth });
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: `${sheetName}!1:1` // Get only the header row
+        });
+
+        const headers = response.data.values[0];
+        if (!headers) {
+            return res.status(400).json({ error: 'No headers found in the sheet' });
+        }
+
+        // Create an array with the same length as headers, filled with empty strings
+        const rowData = new Array(headers.length).fill('');
+
+        // Map the incoming data to the correct positions based on headers
+        for (const [field, value] of Object.entries(req.body)) {
+            if (fieldMappings[field]) {
+                const columnIndex = headers.indexOf(fieldMappings[field]);
+                if (columnIndex !== -1) {
+                    rowData[columnIndex] = value;
+                }
+            }
+        }
 
         // Write the data to the sheet
         await writeToSheet(sheetName, rowData);
