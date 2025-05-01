@@ -136,6 +136,7 @@ router.post('/:sheetName', async (req, res, next) => {
         circuit_transfer_price,
         flight_id,
         flight_booking_reference,
+        flight_quantity,
         ticketing_deadline,
         flight_status,
         flight_price,
@@ -148,7 +149,16 @@ router.post('/:sheetName', async (req, res, next) => {
         payment_2,
         payment_2_date,
         payment_3,
-        payment_3_date
+        payment_3_date,
+        consultant,
+        acquisition,
+        booking_type,
+        atol_abtot,
+        check_in_date,
+        check_out_date,
+        nights,
+        extra_nights,
+        adults
     } = req.body;
 
     // Define the field mappings (now they match exactly with the sheet headers)
@@ -179,6 +189,7 @@ router.post('/:sheetName', async (req, res, next) => {
         circuit_transfer_price: 'circuit_transfer_price',
         flight_id: 'flight_id',
         flight_booking_reference: 'flight_booking_reference',
+        flight_quantity: 'flight_quantity',
         ticketing_deadline: 'ticketing_deadline',
         flight_status: 'flight_status',
         flight_price: 'flight_price',
@@ -191,7 +202,16 @@ router.post('/:sheetName', async (req, res, next) => {
         payment_2: 'payment_2',
         payment_2_date: 'payment_2_date',
         payment_3: 'payment_3',
-        payment_3_date: 'payment_3_date'
+        payment_3_date: 'payment_3_date',
+        consultant: 'consultant',
+        acquisition: 'acquisition',
+        booking_type: 'booking_type',
+        atol_abtot: 'atol_abtot',
+        check_in_date: 'check_in_date',
+        check_out_date: 'check_out_date',
+        nights: 'nights',
+        extra_nights: 'extra_nights',
+        adults: 'adults'
     };
 
     try {
