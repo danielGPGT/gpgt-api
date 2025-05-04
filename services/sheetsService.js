@@ -83,12 +83,15 @@ async function readSheet(sheetName) {
 async function writeToSheet(sheetName, data) {
     const sheets = google.sheets({ version: 'v4', auth });
     try {
+        // Convert empty strings to null
+        const processedData = data.map(value => value === '' ? null : value);
+        
         await sheets.spreadsheets.values.append({
             spreadsheetId,
             range: sheetName,
             valueInputOption: 'RAW',
             requestBody: {
-                values: [data], // Add the row as a single array
+                values: [processedData], // Add the row as a single array
             },
         });
         console.log(`Data written to sheet "${sheetName}" successfully.`);

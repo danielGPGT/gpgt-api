@@ -193,7 +193,7 @@ async function triggerRunAllUpdates(sheetName) {
         const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, '');
         const action = normalizedSheetName === 'stock-tickets' ? 'updateTickets' : 'runAllUpdates';
         
-        const response = await axios.post('https://script.google.com/macros/s/AKfycbxymHMKdVcpDvmr83Va3lzPqpgrYkPnKsmWkDGP5bp78jqoV-nFpYwt6zSFo6Sf5v_R/exec', {
+        const response = await axios.post('https://script.google.com/macros/s/AKfycbxB9PB3NGOhM2HtZdN9D_O5DPdqHnDEiPBRSZ2bYTSYjaOqKVf_oxOafk00ljlv84nE/exec', {
             action: action
         });
         console.log(`${action} triggered:`, response.data);
