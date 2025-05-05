@@ -2,7 +2,7 @@ const { google } = require('googleapis');
 const path = require('path');
 
 const NodeCache = require('node-cache');
-const sheetCache = new NodeCache({ stdTTL: 30 }); // Cache data for 10 minutes
+const sheetCache = new NodeCache({ stdTTL: 2 }); // Cache data for 10 minutes
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.resolve(__dirname, '../config/google.json'),

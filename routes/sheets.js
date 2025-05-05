@@ -11,6 +11,124 @@ const auth = new google.auth.GoogleAuth({
 
 const spreadsheetId = process.env.SPREADSHEET_ID;
 
+// Define the field mappings for booking data
+const bookingFieldMappings = {
+    // Status and reference fields
+    status: 'status',
+    booking_ref: 'booking_ref',
+    booking_type: 'booking_type',
+    consultant: 'consultant',
+    acquisition: 'acquisition',
+    event_id: 'event_id',
+    package_id: 'package_id',
+    atol_abtot: 'atol_abtot',
+    booking_date: 'booking_date',
+    
+    // Booker information
+    booker_name: 'booker_name',
+    booker_email: 'booker_email',
+    booker_phone: 'booker_phone',
+    booker_address: 'booker_address',
+    
+    // Traveller information
+    lead_traveller_name: 'lead_traveller_name',
+    lead_traveller_email: 'lead_traveller_email',
+    lead_traveller_phone: 'lead_traveller_phone',
+    guest_traveller_names: 'guest_traveller_names',
+    adults: 'adults',
+    
+    // Ticket information
+    ticket_id: 'ticket_id',
+    ticket_quantity: 'ticket_quantity',
+    ticket_price: 'ticket_price',
+    
+    // Hotel information
+    hotel_id: 'hotel_id',
+    room_id: 'room_id',
+    check_in_date: 'check_in_date',
+    check_out_date: 'check_out_date',
+    nights: 'nights',
+    extra_nights: 'extra_nights',
+    room_quantity: 'room_quantity',
+    room_price: 'room_price',
+    
+    // Transfer information
+    airport_transfer_id: 'airport_transfer_id',
+    airport_transfer_quantity: 'airport_transfer_quantity',
+    airport_transfer_price: 'airport_transfer_price',
+    circuit_transfer_id: 'circuit_transfer_id',
+    circuit_transfer_quantity: 'circuit_transfer_quantity',
+    circuit_transfer_price: 'circuit_transfer_price',
+    
+    // Flight information
+    flight_id: 'flight_id',
+    flight_booking_reference: 'flight_booking_reference',
+    ticketing_deadline: 'ticketing_deadline',
+    flight_status: 'flight_status',
+    flight_quantity: 'flight_quantity',
+    flight_price: 'flight_price',
+    
+    // Lounge pass information
+    lounge_pass_id: 'lounge_pass_id',
+    lounge_pass_quantity: 'lounge_pass_quantity',
+    lounge_pass_price: 'lounge_pass_price',
+    
+    // Payment information
+    payment_currency: 'payment_currency',
+    payment_1: 'payment_1',
+    payment_1_date: 'payment_1_date',
+    payment_2: 'payment_2',
+    payment_2_date: 'payment_2_date',
+    payment_3: 'payment_3',
+    payment_3_date: 'payment_3_date'
+};
+
+// Define the field mappings for stock/ticket data
+const stockFieldMappings = {
+    event: 'Event',
+    package_type: 'Package Type',
+    ticket_id: 'Ticket ID',
+    ticket_name: 'Ticket Name',
+    supplier: 'Supplier',
+    ref: 'Ref',
+    actual_stock: 'Actual stock',
+    used: 'Used',
+    remaining: 'Remaining',
+    currency_bought_in: 'Currency (Bought in)',
+    unit_cost_local: 'Unit Cost (Local)',
+    unit_cost_gbp: 'Unit Cost (GBP)',
+    total_cost_local: 'Total Cost  (Local)',
+    total_cost_gbp: 'Total Cost (GBP)',
+    is_provsional: 'Is Provsional',
+    ordered: 'Ordered',
+    paid: 'Paid',
+    tickets_received: 'Tickets Received',
+    markup: 'Markup',
+    event_days: 'Event Days',
+    ticket_type: 'Ticket Type',
+    video_wall: 'Video Wall',
+    covered_seat: 'Covered Seat',
+    numbered_seat: 'Numbered Seat',
+    delivery_days: 'Delivery days',
+    ticket_description: 'Ticket Description',
+    ticket_image_1: 'Ticket image 1',
+    ticket_image_2: 'Ticket Image 2'
+};
+
+// Define the field mappings for hotel data
+const hotelFieldMappings = {
+    event_name: 'Event Name',
+    package_id: 'Package ID',
+    hotel_id: 'Hotel ID',
+    hotel_name: 'Hotel Name',
+    stars: 'Stars',
+    package_type: 'Package Type',
+    hotel_info: 'Hotel Info',
+    longitude: 'Longitude',
+    latitude: 'Latitude',
+    images: 'Images'
+};
+
 // GET route to fetch data for a specific sheet
 router.get('/:sheetName', async (req, res, next) => {
     const { sheetName } = req.params;
@@ -191,9 +309,42 @@ router.get('/:sheetName', async (req, res, next) => {
 async function triggerRunAllUpdates(sheetName) {
     try {
         const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, '');
-        const action = normalizedSheetName === 'stock-tickets' ? 'updateTickets' : 'runAllUpdates';
+        let action;
         
-        const response = await axios.post('https://script.google.com/macros/s/AKfycbxB9PB3NGOhM2HtZdN9D_O5DPdqHnDEiPBRSZ2bYTSYjaOqKVf_oxOafk00ljlv84nE/exec', {
+        // Determine the action based on the sheet name
+        switch (normalizedSheetName) {
+            case 'stock-tickets':
+                action = 'updateTickets';
+                break;
+            case 'hotels':
+                action = 'updateHotels';
+                break;
+            case 'stock-rooms':
+                action = 'updateRooms';
+                break;
+            case 'event':
+                action = 'updateEvents';
+                break;
+            case 'packages':
+                action = 'updatePackages';
+                break;
+            case 'stock-circuit-transfers':
+                action = 'updateCircuitTransfers';
+                break;
+            case 'stock-flights':
+                action = 'updateFlights';
+                break;
+            case 'stock-airport-transfers':
+                action = 'updateAirportTransfers';
+                break;
+            case 'stock-lounge-passes':
+                action = 'updateLoungePasses';
+                break;
+            default:
+                action = 'runAllUpdates';
+        }
+        
+        const response = await axios.post('https://script.google.com/macros/s/AKfycbyLjfjA6bTntKT4ydJkFbg0xEqlvmf9PXRiR3UfoehpTLhZMKuuOhKJHLeXFK3wYlOI/exec', {
             action: action
         });
         console.log(`${action} triggered:`, response.data);
@@ -207,191 +358,6 @@ router.post('/:sheetName', async (req, res, next) => {
     const { sheetName } = req.params;
     console.log('Writing to sheet:', sheetName);
     console.log('Request body:', req.body);
-
-    const {
-        // Ticket/Stock fields
-        event,
-        package_id,
-        package_type,
-        ticket_id,
-        ticket_name,
-        supplier,
-        ref,
-        actual_stock,
-        used,
-        remaining,
-        currency_bought_in,
-        unit_cost_local,
-        unit_cost_gbp,
-        total_cost_local,
-        total_cost_gbp,
-        is_provsional,
-        ordered,
-        paid,
-        tickets_received,
-        markup,
-        event_days,
-        ticket_type,
-        video_wall,
-        covered_seat,
-        numbered_seat,
-        delivery_days,
-        ticket_description,
-        ticket_image_1,
-        ticket_image_2,
-        // Booking fields
-        booker_name,
-        booker_email,
-        booker_phone,
-        booker_address,
-        lead_traveller_name,
-        lead_traveller_email,
-        lead_traveller_phone,
-        guest_traveller_names,
-        booking_date,
-        event_id,
-        ticket_quantity,
-        ticket_price,
-        hotel_id,
-        room_id,
-        room_quantity,
-        room_price,
-        airport_transfer_id,
-        airport_transfer_quantity,
-        airport_transfer_price,
-        circuit_transfer_id,
-        circuit_transfer_quantity,
-        circuit_transfer_price,
-        flight_id,
-        flight_booking_reference,
-        ticketing_deadline,
-        flight_status,
-        flight_price,
-        lounge_pass_id,
-        lounge_pass_quantity,
-        lounge_pass_price,
-        payment_currency,
-        payment_1,
-        payment_1_date,
-        payment_2,
-        payment_2_date,
-        payment_3,
-        payment_3_date,
-        consultant,
-        acquisition,
-        booking_type,
-        atol_abtot,
-        check_in_date,
-        check_out_date,
-        nights,
-        extra_nights,
-        adults
-    } = req.body;
-
-    // Define the field mappings for booking data
-    const bookingFieldMappings = {
-        // Status and reference fields
-        status: 'status',
-        booking_ref: 'booking_ref',
-        booking_type: 'booking_type',
-        consultant: 'consultant',
-        acquisition: 'acquisition',
-        event_id: 'event_id',
-        package_id: 'package_id',
-        atol_abtot: 'atol_abtot',
-        booking_date: 'booking_date',
-        
-        // Booker information
-        booker_name: 'booker_name',
-        booker_email: 'booker_email',
-        booker_phone: 'booker_phone',
-        booker_address: 'booker_address',
-        
-        // Traveller information
-        lead_traveller_name: 'lead_traveller_name',
-        lead_traveller_email: 'lead_traveller_email',
-        lead_traveller_phone: 'lead_traveller_phone',
-        guest_traveller_names: 'guest_traveller_names',
-        adults: 'adults',
-        
-        // Ticket information
-        ticket_id: 'ticket_id',
-        ticket_quantity: 'ticket_quantity',
-        ticket_price: 'ticket_price',
-        
-        // Hotel information
-        hotel_id: 'hotel_id',
-        room_id: 'room_id',
-        check_in_date: 'check_in_date',
-        check_out_date: 'check_out_date',
-        nights: 'nights',
-        extra_nights: 'extra_nights',
-        room_quantity: 'room_quantity',
-        room_price: 'room_price',
-        
-        // Transfer information
-        airport_transfer_id: 'airport_transfer_id',
-        airport_transfer_quantity: 'airport_transfer_quantity',
-        airport_transfer_price: 'airport_transfer_price',
-        circuit_transfer_id: 'circuit_transfer_id',
-        circuit_transfer_quantity: 'circuit_transfer_quantity',
-        circuit_transfer_price: 'circuit_transfer_price',
-        
-        // Flight information
-        flight_id: 'flight_id',
-        flight_booking_reference: 'flight_booking_reference',
-        ticketing_deadline: 'ticketing_deadline',
-        flight_status: 'flight_status',
-        flight_quantity: 'flight_quantity',
-        flight_price: 'flight_price',
-        
-        // Lounge pass information
-        lounge_pass_id: 'lounge_pass_id',
-        lounge_pass_quantity: 'lounge_pass_quantity',
-        lounge_pass_price: 'lounge_pass_price',
-        
-        // Payment information
-        payment_currency: 'payment_currency',
-        payment_1: 'payment_1',
-        payment_1_date: 'payment_1_date',
-        payment_2: 'payment_2',
-        payment_2_date: 'payment_2_date',
-        payment_3: 'payment_3',
-        payment_3_date: 'payment_3_date'
-    };
-
-    // Define the field mappings for stock/ticket data
-    const stockFieldMappings = {
-        event: 'Event',
-        package_id: 'Package ID',
-        package_type: 'Package Type',
-        ticket_id: 'Ticket ID',
-        ticket_name: 'Ticket Name',
-        supplier: 'Supplier',
-        ref: 'Ref',
-        actual_stock: 'Actual stock',
-        used: 'Used',
-        remaining: 'Remaining',
-        currency_bought_in: 'Currency (Bought in)',
-        unit_cost_local: 'Unit Cost (Local)',
-        unit_cost_gbp: 'Unit Cost (GBP)',
-        total_cost_local: 'Total Cost  (Local)',
-        total_cost_gbp: 'Total Cost (GBP)',
-        is_provsional: 'Is Provsional',
-        ordered: 'Ordered',
-        paid: 'Paid',
-        tickets_received: 'Tickets Received',
-        markup: 'Markup',
-        event_days: 'Event Days',
-        ticket_type: 'Ticket Type',
-        video_wall: 'Video Wall',
-        covered_seat: 'Covered Seat',
-        numbered_seat: 'Numbered Seat',
-        delivery_days: 'Delivery days',
-        ticket_description: 'Ticket Description',
-        ticket_image_1: 'Ticket image 1',
-        ticket_image_2: 'Ticket Image 2'
-    };
 
     try {
         // First, get the headers from the sheet to ensure correct order
@@ -410,22 +376,40 @@ router.post('/:sheetName', async (req, res, next) => {
         // Create an array with the same length as headers, filled with empty strings
         const rowData = new Array(headers.length).fill('');
 
-        // Choose the appropriate field mappings based on the sheet name
-        const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, '');
-        const fieldMappings = normalizedSheetName === 'bookingfile' ? bookingFieldMappings : stockFieldMappings;
-
-        // Map the incoming data to the correct positions based on headers
-        for (const [field, value] of Object.entries(req.body)) {
-            const columnName = fieldMappings[field];
-            if (columnName) {
-                const columnIndex = headers.indexOf(columnName);
-                if (columnIndex !== -1) {
-                    rowData[columnIndex] = value;
-                } else {
-                    console.log(`Column ${columnName} not found in headers`);
+        // If the request body is an array, map it directly to columns
+        if (Array.isArray(req.body)) {
+            req.body.forEach((value, index) => {
+                if (index < headers.length) {
+                    rowData[index] = value;
                 }
+            });
+        } else {
+            // Handle object data with field mappings
+            const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, '');
+            let fieldMappings;
+            if (normalizedSheetName === 'bookingfile') {
+                fieldMappings = bookingFieldMappings;
+            } else if (normalizedSheetName === 'stock-tickets') {
+                fieldMappings = stockFieldMappings;
+            } else if (normalizedSheetName === 'hotels') {
+                fieldMappings = hotelFieldMappings;
             } else {
-                console.log(`No mapping found for field ${field}`);
+                return res.status(400).json({ error: 'Unsupported sheet type' });
+            }
+
+            // Map the incoming data to the correct positions based on headers
+            for (const [field, value] of Object.entries(req.body)) {
+                const columnName = fieldMappings[field];
+                if (columnName) {
+                    const columnIndex = headers.indexOf(columnName);
+                    if (columnIndex !== -1) {
+                        rowData[columnIndex] = value;
+                    } else {
+                        console.log(`Column ${columnName} not found in headers`);
+                    }
+                } else {
+                    console.log(`No mapping found for field ${field}`);
+                }
             }
         }
 
@@ -444,56 +428,54 @@ router.post('/:sheetName', async (req, res, next) => {
     }
 });
 
-// PUT route to update data in a specific sheet
+// PUT route to update a single cell in a specific sheet
 router.put('/:sheetName/:idColumn/:idValue', async (req, res, next) => {
     const { sheetName, idColumn, idValue } = req.params;
+    const { column, value } = req.body;
+
+    if (!column || value === undefined) {
+        return res.status(400).json({ error: 'Column and value are required in the request body' });
+    }
 
     try {
         const sheets = google.sheets({ version: 'v4', auth });
-        const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
         
+        // Find the row number
+        const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
         if (!rowNumber) {
             return res.status(404).json({ error: 'Item not found' });
         }
 
-        // Get headers to map the data correctly
+        // Get headers to find the column index
         const headersResponse = await sheets.spreadsheets.values.get({
             spreadsheetId,
             range: `${sheetName}!1:1`
         });
 
         const headers = headersResponse.data.values[0];
-        const rowData = new Array(headers.length).fill('');
-
-        // Choose the appropriate field mappings based on the sheet name
-        const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, '');
-        const fieldMappings = normalizedSheetName === 'bookingfile' ? bookingFieldMappings : stockFieldMappings;
-
-        // Map the update data to the correct columns
-        for (const [field, value] of Object.entries(req.body)) {
-            const columnName = fieldMappings[field];
-            if (columnName) {
-                const columnIndex = headers.indexOf(columnName);
-                if (columnIndex !== -1) {
-                    rowData[columnIndex] = value;
-                }
-            }
+        const columnIndex = headers.indexOf(column);
+        
+        if (columnIndex === -1) {
+            return res.status(400).json({ error: `Column '${column}' not found in sheet` });
         }
 
-        // Update the row
+        // Convert column index to letter (A=0, B=1, etc.)
+        const columnLetter = String.fromCharCode(65 + columnIndex);
+        
+        // Update only the specific cell
         await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `${sheetName}!A${rowNumber}`,
+            range: `${sheetName}!${columnLetter}${rowNumber}`,
             valueInputOption: 'RAW',
             requestBody: {
-                values: [rowData]
+                values: [[value]]
             }
         });
 
         // Trigger appropriate Google Apps Script updates
         await triggerRunAllUpdates(sheetName);
 
-        res.json({ message: 'Item updated successfully' });
+        res.json({ message: 'Cell updated successfully' });
     } catch (error) {
         next(error);
     }
@@ -542,55 +524,6 @@ router.delete('/:sheetName/:idColumn/:idValue', async (req, res, next) => {
 
         res.json({ message: 'Item deleted successfully' });
     } catch (error) {
-        next(error);
-    }
-});
-
-// DELETE route for tickets specifically
-router.delete('/Stock - tickets/ticket_id/:ticketId', async (req, res, next) => {
-    const { ticketId } = req.params;
-    const sheetName = 'Stock - tickets';
-
-    try {
-        const sheets = google.sheets({ version: 'v4', auth });
-        const rowNumber = await findRowById(sheets, sheetName, 'Ticket ID', ticketId);
-        
-        if (!rowNumber) {
-            return res.status(404).json({ error: 'Ticket not found' });
-        }
-
-        // Get the sheet's metadata to find the sheet ID
-        const sheetMetadata = await sheets.spreadsheets.get({
-            spreadsheetId,
-            ranges: [sheetName],
-            includeGridData: false
-        });
-
-        const sheetId = sheetMetadata.data.sheets[0].properties.sheetId;
-
-        // Delete the row
-        await sheets.spreadsheets.batchUpdate({
-            spreadsheetId,
-            requestBody: {
-                requests: [{
-                    deleteDimension: {
-                        range: {
-                            sheetId: sheetId,
-                            dimension: 'ROWS',
-                            startIndex: rowNumber - 1,
-                            endIndex: rowNumber
-                        }
-                    }
-                }]
-            }
-        });
-
-        // Trigger Google Apps Script updates
-        await triggerRunAllUpdates(sheetName);
-
-        res.status(200).json({ message: 'Ticket successfully deleted' });
-    } catch (error) {
-        console.error('Error deleting ticket:', error);
         next(error);
     }
 });
