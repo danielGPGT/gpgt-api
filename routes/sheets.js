@@ -23,7 +23,10 @@ const bookingFieldMappings = {
   consultant: "consultant",
   acquisition: "acquisition",
   event_id: "event_id",
+  sport: "Sport",
+  event_name: "Event Name",
   package_id: "package_id",
+  package_type: "Package Type",
   atol_abtot: "atol_abtot",
   booking_date: "booking_date",
 
@@ -42,38 +45,56 @@ const bookingFieldMappings = {
 
   // Ticket information
   ticket_id: "ticket_id",
+  ticket_name: "Ticket Name",
   ticket_quantity: "ticket_quantity",
+  ticket_cost: "Ticket Cost",
   ticket_price: "ticket_price",
 
   // Hotel information
   hotel_id: "hotel_id",
+  hotel_name: "Hotel Name",
   room_id: "room_id",
+  room_category: "Room Category",
+  room_type: "Room Type",
   check_in_date: "check_in_date",
   check_out_date: "check_out_date",
   nights: "nights",
   extra_nights: "extra_nights",
   room_quantity: "room_quantity",
+  room_cost: "Room Cost",
   room_price: "room_price",
 
   // Transfer information
   airport_transfer_id: "airport_transfer_id",
+  airport_transfer_type: "Airport Transfer Type",
   airport_transfer_quantity: "airport_transfer_quantity",
+  airport_transfer_cost: "Airport Transfer Cost",
   airport_transfer_price: "airport_transfer_price",
   circuit_transfer_id: "circuit_transfer_id",
+  circuit_transfer_type: "Circuit Transfer Type",
   circuit_transfer_quantity: "circuit_transfer_quantity",
+  circuit_transfer_cost: "Circuit Transfer Cost",
   circuit_transfer_price: "circuit_transfer_price",
 
   // Flight information
   flight_id: "flight_id",
+  flight_outbound: "Flight Outbound",
+  flight_inbound: "Flight Inbound",
+  flight_class: "Flight Class",
+  flight_carrier: "Flight Carrier",
+  flight_source: "Flight Source",
   flight_booking_reference: "flight_booking_reference",
   ticketing_deadline: "ticketing_deadline",
   flight_status: "flight_status",
   flight_quantity: "flight_quantity",
+  flight_cost: "Flight Cost",
   flight_price: "flight_price",
 
   // Lounge pass information
   lounge_pass_id: "lounge_pass_id",
+  lounge_pass_variant: "Lounge Pass Variant",
   lounge_pass_quantity: "lounge_pass_quantity",
+  lounge_pass_cost: "Lounge Pass Cost",
   lounge_pass_price: "lounge_pass_price",
 
   // Payment information
@@ -86,7 +107,13 @@ const bookingFieldMappings = {
   payment_2_status: "payment_2_status",
   payment_3: "payment_3",
   payment_3_date: "payment_3_date",
-  payment_3_status: "payment_3_status"
+  payment_3_status: "payment_3_status",
+  amount_due: "Amount Due",
+  payment_status: "Payment Status",
+  total_cost: "Total Cost",
+  total_sold_local: "Total Sold For Local",
+  total_sold_gbp: "Total Sold GBP",
+  pnl: "P&L"
 };
 
 // Define the field mappings for stock/ticket data
@@ -183,6 +210,7 @@ router.get("/:sheetName", async (req, res, next) => {
 
     // Define a map between query parameters and sheet column names
     const filters = {
+      bookingId: "booking_id",
       eventId: "event_id",
 
       ticketId: "ticket_id",
@@ -237,7 +265,6 @@ router.get("/:sheetName", async (req, res, next) => {
       payment3: "payment_3",
       payment3Status: "payment_3_status",
       payment3Date: "payment_3_date",
-      bookingId: "booking_id",
     };
 
     // Apply filters dynamically
