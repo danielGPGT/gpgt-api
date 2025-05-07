@@ -179,6 +179,44 @@ const flightFieldMappings = {
   used: "Used",
 };
 
+const packageFieldMappings = {
+  event: "Event",
+  event_id: "Event ID",
+  package_id: "Package ID",
+  package_name: "Package Name",
+  package_type: "Package Type",
+  package_start_date: "Package Start Date",
+  package_end_date: "Package End Date",
+  url: "url"
+};
+
+const userFieldMappings = {
+  email: "Email",
+  phone: "Phone",
+  password: "Password",
+  role: "Role",
+  first_name: "First Name",
+  last_name: "Last Name",
+  company: "Company",
+  login_count: "login_count",
+  last_login: "last_login",
+  b2b_commission: "b2b_commission",
+  user_id: "User ID"
+};
+
+const tierFieldMappings = {
+  package_name: "package_name",
+  package_id: "package_id",
+  tier_id: "tier_id",
+  tier_type: "tier_type",
+  ticket_id: "ticket_id",
+  ticket_name: "ticket_name",
+  hotel_id: "hotel_id",
+  room_id: "room_id",
+  circuit_transfer_id: "circuit_transfer_id",
+  airport_transfer_id: "airport_transfer_id"
+};
+
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
@@ -298,7 +336,7 @@ router.get("/:sheetName", async (req, res, next) => {
 async function findRowById(sheets, sheetName, idColumn, idValue) {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A:Z`,
+    range: `'${sheetName}'!A:ZZ`,  // Changed to A:ZZ
   });
 
   const rows = response.data.values;
@@ -333,12 +371,12 @@ router.get("/:sheetName", async (req, res, next) => {
 
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${sheetName}!A${rowNumber}:Z${rowNumber}`,
+        range: `'${sheetName}'!A${rowNumber}:ZZ${rowNumber}`,  // Changed to A:ZZ
       });
 
       const headers = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${sheetName}!1:1`,
+        range: `'${sheetName}'!A1:ZZ1`,  // Changed to A:ZZ
       });
 
       const row = response.data.values[0];
@@ -352,7 +390,7 @@ router.get("/:sheetName", async (req, res, next) => {
       // Get all data
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${sheetName}!A:Z`,
+        range: `'${sheetName}'!A:ZZ`,  // Changed to A:ZZ
       });
 
       const rows = response.data.values;
@@ -399,6 +437,9 @@ async function triggerRunAllUpdates(sheetName) {
       case "packages":
         action = "updatePackages";
         break;
+      case "package-tiers":
+        action = "updatePackageTiers";
+        break;
       case "stock-circuit-transfers":
         action = "updateCircuitTransfers";
         break;
@@ -416,7 +457,7 @@ async function triggerRunAllUpdates(sheetName) {
     }
 
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbwmN_ak-QU72n3-pZvt54CYFrfZ-V7MhN2z67Rj5yu3Y966OYf74JvfOUwt-Wc6ZXQO/exec",
+      "https://script.google.com/macros/s/AKfycbwquLfO2CByeT2n4dhyGvsXRtFDimyWe-lt5TqcxUXemFaDbw7cIoxcty6y1abk0EA/exec",
       {
         action: action,
       }
@@ -425,6 +466,16 @@ async function triggerRunAllUpdates(sheetName) {
   } catch (error) {
     console.error(`Error triggering ${action}:`, error.message);
   }
+}
+
+// Helper function to convert column index to letter (0 = A, 1 = B, 26 = AA, etc.)
+function columnIndexToLetter(index) {
+  let letter = '';
+  while (index >= 0) {
+    letter = String.fromCharCode(65 + (index % 26)) + letter;
+    index = Math.floor(index / 26) - 1;
+  }
+  return letter;
 }
 
 // POST route to write data to a specific sheet
@@ -469,6 +520,12 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = hotelFieldMappings;
       } else if (normalizedSheetName === "stock-flights") {
         fieldMappings = flightFieldMappings;
+      } else if (normalizedSheetName === "packages") {
+        fieldMappings = packageFieldMappings;
+      } else if (normalizedSheetName === "users") {
+        fieldMappings = userFieldMappings;
+      } else if (normalizedSheetName === "package-tiers") {
+        fieldMappings = tierFieldMappings;
       } else {
         return res.status(400).json({ error: "Unsupported sheet type" });
       }
@@ -509,6 +566,14 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
   const { column, value } = req.body;
 
+  console.log('Update request:', {
+    sheetName,
+    idColumn,
+    idValue,
+    column,
+    value
+  });
+
   // Create a unique key for this update
   const updateKey = `${sheetName}-${idValue}-${column}`;
   
@@ -528,6 +593,8 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
 
     // Find the row number
     const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
+    console.log('Found row number:', rowNumber);
+    
     if (!rowNumber) {
       pendingUpdates.delete(updateKey);
       return res.status(404).json({ error: "Item not found" });
@@ -536,37 +603,58 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
     // Get headers to find the column index
     const headersResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!1:1`,
+      range: `'${sheetName}'!A1:ZZ1`,
     });
 
     const headers = headersResponse.data.values[0];
-    const columnIndex = headers.indexOf(column);
+    console.log('Sheet headers:', headers);
+    
+    // Handle column mapping for booking sheet
+    let columnToUpdate = column;
+    const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
+    if (normalizedSheetName === "bookingfile") {
+      const fieldMappings = bookingFieldMappings;
+      // Find the sheet column name for the given field
+      for (const [field, sheetColumn] of Object.entries(fieldMappings)) {
+        if (field === column) {
+          columnToUpdate = sheetColumn;
+          break;
+        }
+      }
+    }
+
+    console.log('Column to update:', columnToUpdate);
+    const columnIndex = headers.indexOf(columnToUpdate);
+    console.log('Column index:', columnIndex);
 
     if (columnIndex === -1) {
       pendingUpdates.delete(updateKey);
       return res
         .status(400)
-        .json({ error: `Column '${column}' not found in sheet` });
+        .json({ error: `Column '${columnToUpdate}' not found in sheet. Available columns: ${headers.join(', ')}` });
     }
 
-    // Convert column index to letter (A=0, B=1, etc.)
-    const columnLetter = String.fromCharCode(65 + columnIndex);
+    // Convert column index to letter using the new function
+    const columnLetter = columnIndexToLetter(columnIndex);
+    console.log('Column letter:', columnLetter);
 
     // Update only the specific cell
-    await sheets.spreadsheets.values.update({
+    const updateResponse = await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!${columnLetter}${rowNumber}`,
+      range: `'${sheetName}'!${columnLetter}${rowNumber}`,
       valueInputOption: "RAW",
       requestBody: {
         values: [[value]],
       },
     });
+    console.log('Update response:', updateResponse.data);
 
     // Trigger appropriate Google Apps Script updates
     await triggerRunAllUpdates(sheetName);
 
     res.json({ message: "Cell updated successfully" });
   } catch (error) {
+    console.error("Error updating cell:", error);
     next(error);
   } finally {
     // Always remove the update from pending updates

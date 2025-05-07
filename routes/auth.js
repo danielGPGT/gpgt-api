@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '1h'; // Default to 24 hours if not specified
 
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -49,16 +50,37 @@ router.post('/login', async (req, res) => {
         // Write updated user back into Google Sheets
         await updateSheetRow('Users', userIndex + 2, user); // Row numbers in Sheets are 1-indexed (+ header)
 
-        // Create JWT
+        // Create JWT with expiry and additional security claims
         const token = jwt.sign({
             email: user.email,
             role: user.role,
             first_name: user.first_name,
             last_name: user.last_name,
-            company: user.company
-        }, JWT_SECRET, { expiresIn: '7d' });
+            company: user.company,
+            b2b_commission: user.b2b_commission,
+            user_id: user.user_id,
+            iat: Math.floor(Date.now() / 1000), // Issued at time
+            jti: `${user.user_id}-${Date.now()}` // Unique token ID
+        }, JWT_SECRET, { 
+            expiresIn: JWT_EXPIRY,
+            algorithm: 'HS256' // Explicitly specify the algorithm
+        });
 
-        return res.status(200).json({ token });
+        // Calculate token expiry time
+        const decodedToken = jwt.decode(token);
+        const expiresAt = new Date(decodedToken.exp * 1000);
+
+        return res.status(200).json({ 
+            token,
+            expiresAt: expiresAt.toISOString(),
+            user: {
+                email: user.email,
+                role: user.role,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                company: user.company
+            }
+        });
     } catch (error) {
         console.error('Login error:', error.message);
         return res.status(500).json({ error: 'Server error during login.' });
