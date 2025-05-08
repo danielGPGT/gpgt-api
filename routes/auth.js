@@ -59,6 +59,7 @@ router.post('/login', async (req, res) => {
             company: user.company,
             b2b_commission: user.b2b_commission,
             user_id: user.user_id,
+            avatar: user.avatar,
             iat: Math.floor(Date.now() / 1000), // Issued at time
             jti: `${user.user_id}-${Date.now()}` // Unique token ID
         }, JWT_SECRET, { 
@@ -78,7 +79,8 @@ router.post('/login', async (req, res) => {
                 role: user.role,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                company: user.company
+                company: user.company,
+                avatar: user.avatar
             }
         });
     } catch (error) {
