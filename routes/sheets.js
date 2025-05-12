@@ -179,6 +179,16 @@ const flightFieldMappings = {
   used: "Used",
 };
 
+const loungePassFieldMappings = {
+  event: "Event",
+  event_id: "Event ID",
+  lounge_pass_id: "Lounge Pass ID",
+  variant: "Variant",
+  used: "Used",
+  cost: "Cost",
+  margin: "Margin"
+};
+
 const packageFieldMappings = {
   event: "Event",
   event_id: "Event ID",
@@ -200,6 +210,7 @@ const userFieldMappings = {
   last_login: "last_login",
   b2b_commission: "b2b_commission",
   user_id: "User ID",
+  avatar: "avatar",
 };
 
 const tierFieldMappings = {
@@ -223,7 +234,8 @@ const eventFieldMappings = {
   event_end_date: "Event End Date",
   venue: "Venue",
   city: "City",
-  venue_map: "Venue Map"
+  venue_map: "Venue Map",
+  consultant_id: "Consultant ID",
 };
 
 // Add at the top of the file with other constants
@@ -425,58 +437,58 @@ router.get("/:sheetName", async (req, res, next) => {
 
 // Helper function to trigger Google Apps Script updates
 async function triggerRunAllUpdates(sheetName) {
+  const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
+  let action;
+
+  // Determine the action based on the sheet name
+  switch (normalizedSheetName) {
+    case "users":
+      action = "updateUsers";
+      break;
+    case "stock-tickets":
+      action = "updateTickets";
+      break;
+    case "hotels":
+      action = "updateHotels";
+      break;
+    case "stock-rooms":
+      action = "updateRooms";
+      break;
+    case "event":
+      action = "updateEvents";
+      break;
+    case "packages":
+      action = "updatePackages";
+      break;
+    case "package-tiers":
+      action = "updatePackageTiers";
+      break;
+    case "stock-circuit-transfers":
+      action = "updateCircuitTransfers";
+      break;
+    case "stock-flights":
+      action = "updateFlights";
+      break;
+    case "stock-airport-transfers":
+      action = "updateAirportTransfers";
+      break;
+    case "stock-lounge-passes":
+      action = "updateLoungePasses";
+      break;
+    default:
+      action = "runAllUpdates";
+  }
+
   try {
-    const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
-    let action;
-
-    // Determine the action based on the sheet name
-    switch (normalizedSheetName) {
-      case "users":
-        action = "updateUsers";
-        break;
-      case "stock-tickets":
-        action = "updateTickets";
-        break;
-      case "hotels":
-        action = "updateHotels";
-        break;
-      case "stock-rooms":
-        action = "updateRooms";
-        break;
-      case "event":
-        action = "updateEvents";
-        break;
-      case "packages":
-        action = "updatePackages";
-        break;
-      case "package-tiers":
-        action = "updatePackageTiers";
-        break;
-      case "stock-circuit-transfers":
-        action = "updateCircuitTransfers";
-        break;
-      case "stock-flights":
-        action = "updateFlights";
-        break;
-      case "stock-airport-transfers":
-        action = "updateAirportTransfers";
-        break;
-      case "stock-lounge-passes":
-        action = "updateLoungePasses";
-        break;
-      default:
-        action = "runAllUpdates";
-    }
-
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbyzbbm1HoCpkv2riZJ98laAWQb6vuDvWD5I0FpjD_GugojILXZP5p_fjtScq8c1h6sp/exec",
+      "https://script.google.com/macros/s/AKfycbwWh0zq2dw-tru6ojEFCcfBgLBaQyFdblWkEs57IeoL4rqSb6Ql_wFEQX81DTFK0D9L/exec",
       {
         action: action,
       }
     );
     console.log(`${action} triggered:`, response.data);
   } catch (error) {
-    console.error(`Error triggering ${action}:`, error.message);
+    console.error(`Error triggering ${action || 'update'}:`, error.message);
   }
 }
 
