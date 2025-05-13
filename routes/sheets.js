@@ -463,16 +463,16 @@ async function triggerRunAllUpdates(sheetName) {
     case "package-tiers":
       action = "updatePackageTiers";
       break;
-    case "stock-circuit-transfers":
+    case "stock-circuittransfers":
       action = "updateCircuitTransfers";
       break;
     case "stock-flights":
       action = "updateFlights";
       break;
-    case "stock-airport-transfers":
+    case "stock-airporttransfers":
       action = "updateAirportTransfers";
       break;
-    case "stock-lounge-passes":
+    case "stock-loungepasses":
       action = "updateLoungePasses";
       break;
     default:
@@ -535,6 +535,8 @@ router.post("/:sheetName", async (req, res, next) => {
     } else {
       // Handle object data with field mappings
       const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
+      console.log("Original sheet name:", sheetName);
+      console.log("Normalized sheet name:", normalizedSheetName);
       let fieldMappings;
       if (normalizedSheetName === "bookingfile") {
         fieldMappings = bookingFieldMappings;
@@ -550,11 +552,11 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = userFieldMappings;
       } else if (normalizedSheetName === "stock-rooms") {
         fieldMappings = roomFieldMappings;
-      } else if (normalizedSheetName === "stock-circuit-transfers") {
+      } else if (normalizedSheetName === "stock-circuittransfers") {
         fieldMappings = circuitTransferFieldMappings;
-      } else if (normalizedSheetName === "stock-airport-transfers") {
+      } else if (normalizedSheetName === "stock-airporttransfers") {
         fieldMappings = airportTransferFieldMappings;
-      } else if (normalizedSheetName === "stock-lounge-passes") {
+      } else if (normalizedSheetName === "stock-loungepasses") {
         fieldMappings = loungePassFieldMappings;
       } else if (normalizedSheetName === "event") {
         fieldMappings = eventFieldMappings;
