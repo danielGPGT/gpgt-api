@@ -11,6 +11,48 @@ const auth = new google.auth.GoogleAuth({
 
 const spreadsheetId = process.env.SPREADSHEET_ID;
 
+// Add caching
+const cache = {
+  headers: new Map(),
+  fieldMappings: new Map(),
+  lastUpdated: new Map(),
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+};
+
+// Helper function to get cached data
+async function getCachedData(key, fetchFn) {
+  const now = Date.now();
+  const cached = cache[key];
+  
+  if (cached && (now - cache.lastUpdated.get(key)) < cache.CACHE_DURATION) {
+    return cached;
+  }
+  
+  const data = await fetchFn();
+  cache[key] = data;
+  cache.lastUpdated.set(key, now);
+  return data;
+}
+
+// Optimize Google Sheets API calls
+const sheets = google.sheets({ version: "v4", auth });
+
+// Batch operations helper
+async function batchUpdate(sheetName, updates) {
+  const batch = updates.map(update => ({
+    range: `'${sheetName}'!${update.range}`,
+    values: [[update.value]]
+  }));
+
+  return sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: "RAW",
+      data: batch
+    }
+  });
+}
+
 // Define the field mappings for booking data
 const bookingFieldMappings = {
   // Primary key
@@ -189,6 +231,28 @@ const loungePassFieldMappings = {
   margin: "Margin"
 };
 
+const airportTransferFieldMappings = {
+  event_name: "Event Name",
+  hotel_id: "Hotel ID",
+  airport_transfer_id: "Airport Transfer ID",
+  hotel_name: "Hotel Name",
+  transport_type: "Transport Type",
+  max_capacity: "Max Capacity",
+  used: "Used",
+  total_budget: "Total Budget",
+  budget_per_car: "Budget per car",
+  supplier: "Supplier",
+  supplier_quote_local: "Supplier quote per car (local)",
+  quote_currency: "Quote Currency (ISO Code only)",
+  supplier_quote_gbp: "Supplier quote per car (GBP)",
+  diff: "diff",
+  total_diff: "Total diff",
+  total_owing: "Total Owing to Supplier",
+  paid_to_supplier: "Paid to Supplier",
+  outstanding: "Outstanding",
+  markup: "Markup"
+};
+
 const packageFieldMappings = {
   event: "Event",
   event_id: "Event ID",
@@ -196,6 +260,9 @@ const packageFieldMappings = {
   package_name: "Package Name",
   package_type: "Package Type",
   url: "url",
+  payment_date_1: "payment_date_1",
+  payment_date_2: "payment_date_2",
+  payment_date_3: "payment_date_3",
 };
 
 const userFieldMappings = {
@@ -255,7 +322,7 @@ router.get("/:sheetName", async (req, res, next) => {
     circuitTransferId,
     loungePassId,
     packageType,
-  } = req.query; // Accept multiple query parameters
+  } = req.query;
 
   try {
     const data = await readSheet(sheetName);
@@ -357,7 +424,7 @@ router.get("/:sheetName", async (req, res, next) => {
 async function findRowById(sheets, sheetName, idColumn, idValue) {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${sheetName}'!A:ZZ`, // Changed to A:ZZ
+    range: `'${sheetName}'!A:ZZ`,
   });
 
   const rows = response.data.values;
@@ -509,23 +576,21 @@ router.post("/:sheetName", async (req, res, next) => {
   console.log("Request body:", req.body);
 
   try {
-    // First, get the headers from the sheet to ensure correct order
-    const sheets = google.sheets({ version: "v4", auth });
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${sheetName}!1:1`, // Get only the header row
+    // Get headers from cache
+    const headers = await getCachedData(`headers-${sheetName}`, async () => {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!1:1`,
+      });
+      return response.data.values[0];
     });
 
-    const headers = response.data.values[0];
-    console.log("Sheet headers:", headers);
     if (!headers) {
       return res.status(400).json({ error: "No headers found in the sheet" });
     }
 
-    // Create an array with the same length as headers, filled with empty strings
     const rowData = new Array(headers.length).fill("");
 
-    // If the request body is an array, map it directly to columns
     if (Array.isArray(req.body)) {
       req.body.forEach((value, index) => {
         if (index < headers.length) {
@@ -533,35 +598,34 @@ router.post("/:sheetName", async (req, res, next) => {
         }
       });
     } else {
-      // Handle object data with field mappings
       const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
       console.log("Original sheet name:", sheetName);
       console.log("Normalized sheet name:", normalizedSheetName);
       let fieldMappings;
       if (normalizedSheetName === "bookingfile") {
-        fieldMappings = bookingFieldMappings;
+        fieldMappings = await getCachedData('bookingFieldMappings', () => bookingFieldMappings);
       } else if (normalizedSheetName === "stock-tickets") {
-        fieldMappings = stockFieldMappings;
+        fieldMappings = await getCachedData('stockFieldMappings', () => stockFieldMappings);
       } else if (normalizedSheetName === "hotels") {
-        fieldMappings = hotelFieldMappings;
+        fieldMappings = await getCachedData('hotelFieldMappings', () => hotelFieldMappings);
       } else if (normalizedSheetName === "stock-flights") {
-        fieldMappings = flightFieldMappings;
+        fieldMappings = await getCachedData('flightFieldMappings', () => flightFieldMappings);
       } else if (normalizedSheetName === "packages") {
-        fieldMappings = packageFieldMappings;
+        fieldMappings = await getCachedData('packageFieldMappings', () => packageFieldMappings);
       } else if (normalizedSheetName === "users") {
-        fieldMappings = userFieldMappings;
+        fieldMappings = await getCachedData('userFieldMappings', () => userFieldMappings);
       } else if (normalizedSheetName === "stock-rooms") {
-        fieldMappings = roomFieldMappings;
+        fieldMappings = await getCachedData('roomFieldMappings', () => roomFieldMappings);
       } else if (normalizedSheetName === "stock-circuittransfers") {
-        fieldMappings = circuitTransferFieldMappings;
+        fieldMappings = await getCachedData('circuitTransferFieldMappings', () => circuitTransferFieldMappings);
       } else if (normalizedSheetName === "stock-airporttransfers") {
-        fieldMappings = airportTransferFieldMappings;
+        fieldMappings = await getCachedData('airportTransferFieldMappings', () => airportTransferFieldMappings);
       } else if (normalizedSheetName === "stock-loungepasses") {
-        fieldMappings = loungePassFieldMappings;
+        fieldMappings = await getCachedData('loungePassFieldMappings', () => loungePassFieldMappings);
       } else if (normalizedSheetName === "event") {
-        fieldMappings = eventFieldMappings;
+        fieldMappings = await getCachedData('eventFieldMappings', () => eventFieldMappings);
       } else if (normalizedSheetName === "package-tiers") {
-        fieldMappings = tierFieldMappings;
+        fieldMappings = await getCachedData('tierFieldMappings', () => tierFieldMappings);
       } else {
         return res.status(400).json({ error: "Unsupported sheet type" });
       }
@@ -584,11 +648,13 @@ router.post("/:sheetName", async (req, res, next) => {
 
     console.log("Row data to write:", rowData);
 
-    // Write the data to the sheet
-    await writeToSheet(sheetName, rowData);
-
-    // Trigger appropriate Google Apps Script updates
-    await triggerRunAllUpdates(sheetName);
+    // Write data and trigger updates in parallel
+    await Promise.all([
+      writeToSheet(sheetName, rowData),
+      triggerRunAllUpdates(sheetName),
+      // Clear cache for this sheet
+      cache.headers.delete(`headers-${sheetName}`)
+    ]);
 
     res.status(200).json({ message: "Data successfully written to the sheet" });
   } catch (error) {
@@ -602,18 +668,10 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
   const { column, value } = req.body;
 
-  console.log("Update request:", {
-    sheetName,
-    idColumn,
-    idValue,
-    column,
-    value,
-  });
+  // Convert empty string to null
+  const processedValue = value === "" ? null : value;
 
-  // Create a unique key for this update
   const updateKey = `${sheetName}-${idValue}-${column}`;
-
-  // Check if this exact update is already in progress
   if (pendingUpdates.has(updateKey)) {
     return res.status(409).json({
       error: "Update already in progress",
@@ -621,36 +679,30 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
     });
   }
 
-  // Mark this update as in progress
   pendingUpdates.set(updateKey, true);
 
   try {
-    const sheets = google.sheets({ version: "v4", auth });
+    // Get headers from cache
+    const headers = await getCachedData(`headers-${sheetName}`, async () => {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${sheetName}'!A1:ZZ1`,
+      });
+      return response.data.values[0];
+    });
 
-    // Find the row number
+    // Find row number
     const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
-    console.log("Found row number:", rowNumber);
-
     if (!rowNumber) {
       pendingUpdates.delete(updateKey);
       return res.status(404).json({ error: "Item not found" });
     }
 
-    // Get headers to find the column index
-    const headersResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `'${sheetName}'!A1:ZZ1`,
-    });
-
-    const headers = headersResponse.data.values[0];
-    console.log("Sheet headers:", headers);
-
-    // Handle column mapping for booking sheet
+    // Handle column mapping
     let columnToUpdate = column;
     const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
     if (normalizedSheetName === "bookingfile") {
-      const fieldMappings = bookingFieldMappings;
-      // Find the sheet column name for the given field
+      const fieldMappings = await getCachedData('bookingFieldMappings', () => bookingFieldMappings);
       for (const [field, sheetColumn] of Object.entries(fieldMappings)) {
         if (field === column) {
           columnToUpdate = sheetColumn;
@@ -659,45 +711,34 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
       }
     }
 
-    console.log("Column to update:", columnToUpdate);
     const columnIndex = headers.indexOf(columnToUpdate);
-    console.log("Column index:", columnIndex);
-
     if (columnIndex === -1) {
       pendingUpdates.delete(updateKey);
-      return res
-        .status(400)
-        .json({
-          error: `Column '${columnToUpdate}' not found in sheet. Available columns: ${headers.join(
-            ", "
-          )}`,
-        });
+      return res.status(400).json({
+        error: `Column '${columnToUpdate}' not found in sheet. Available columns: ${headers.join(", ")}`,
+      });
     }
 
-    // Convert column index to letter using the new function
     const columnLetter = columnIndexToLetter(columnIndex);
-    console.log("Column letter:", columnLetter);
+    
+    // Use batch update with processed value
+    await batchUpdate(sheetName, [{
+      range: `${columnLetter}${rowNumber}`,
+      value: processedValue
+    }]);
 
-    // Update only the specific cell
-    const updateResponse = await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${sheetName}'!${columnLetter}${rowNumber}`,
-      valueInputOption: "RAW",
-      requestBody: {
-        values: [[value]],
-      },
-    });
-    console.log("Update response:", updateResponse.data);
-
-    // Trigger appropriate Google Apps Script updates
-    await triggerRunAllUpdates(sheetName);
+    // Trigger updates in parallel
+    await Promise.all([
+      triggerRunAllUpdates(sheetName),
+      // Clear cache for this sheet
+      cache.headers.delete(`headers-${sheetName}`)
+    ]);
 
     res.json({ message: "Cell updated successfully" });
   } catch (error) {
     console.error("Error updating cell:", error);
     next(error);
   } finally {
-    // Always remove the update from pending updates
     pendingUpdates.delete(updateKey);
   }
 });

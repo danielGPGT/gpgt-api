@@ -8,7 +8,7 @@ const fs = require('fs');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '1h'; // Default to 24 hours if not specified
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '24h'; // Default to 24 hours if not specified
 
 // Configure Cloudinary
 cloudinary.config({
