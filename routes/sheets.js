@@ -4,19 +4,49 @@ const { google } = require("googleapis");
 const path = require("path");
 const axios = require("axios");
 const router = express.Router();
-const auth = new google.auth.GoogleAuth({
-  keyFile: path.resolve(__dirname, "../config/google.json"),
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
 
+// Function to get Google auth credentials
+function getGoogleAuth() {
+    // First try to get credentials from environment variable (Render)
+    const credentialsJson = process.env.GOOGLE_CREDENTIALS;
+    if (credentialsJson) {
+        try {
+            const credentials = JSON.parse(credentialsJson);
+            return new google.auth.GoogleAuth({
+                credentials,
+                scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+            });
+        } catch (error) {
+            console.error('Error parsing GOOGLE_CREDENTIALS:', error);
+            throw new Error('Failed to parse Google credentials from environment variable');
+        }
+    }
+
+    // Fall back to file-based authentication (local development)
+    try {
+        return new google.auth.GoogleAuth({
+            keyFile: path.resolve(__dirname, "../config/google.json"),
+            scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+        });
+    } catch (error) {
+        console.error('Error loading Google credentials:', error);
+        throw new Error('Failed to initialize Google authentication. Please ensure credentials are properly configured.');
+    }
+}
+
+const auth = getGoogleAuth();
 const spreadsheetId = process.env.SPREADSHEET_ID;
+
+if (!spreadsheetId) {
+    throw new Error('SPREADSHEET_ID environment variable is required');
+}
 
 // Add caching
 const cache = {
-  headers: new Map(),
-  fieldMappings: new Map(),
-  lastUpdated: new Map(),
-  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+    headers: new Map(),
+    fieldMappings: new Map(),
+    lastUpdated: new Map(),
+    CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
 };
 
 // Helper function to get cached data
