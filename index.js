@@ -20,9 +20,7 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(helmet({
-    crossOriginResourcePolicy: false
-}));
+app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 
