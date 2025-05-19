@@ -14,7 +14,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: 'https://dapper-dango-a29b63.netlify.app',
     credentials: true
 }));
 
