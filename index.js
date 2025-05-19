@@ -14,7 +14,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cors({
-    origin: 'https://dapper-dango-a29b63.netlify.app',
+    origin: 'https://glowing-sundae-f3e045.netlify.app/',
     credentials: true
 }));
 
