@@ -135,6 +135,7 @@ const bookingFieldMappings = {
   // Lounge pass information
   lounge_pass_id: "lounge_pass_id",
   lounge_pass_variant: "Lounge Pass Variant",
+  lounge_booking_reference: "lounge_booking_reference",
   lounge_pass_quantity: "lounge_pass_quantity",
   lounge_pass_cost: "Lounge Pass Cost",
   lounge_pass_price: "lounge_pass_price",
