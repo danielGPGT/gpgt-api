@@ -9,20 +9,14 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',') 
-    : ['http://localhost:5173'];
-
-app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-}));
-
 // Middleware
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
+app.use(cors({
+    origin: ['http://localhost:5173', 'https://glowing-sundae-f3e045.netlify.app'],
+    credentials: true
+}));
 
 // Routes
 app.use('/api/v1', authRoutes); // <-- Mount auth first
