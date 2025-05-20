@@ -192,6 +192,7 @@ const bookingFieldMappings = {
 // Define the field mappings for stock/ticket data
 const stockFieldMappings = {
   event: "Event",
+  category_id: "category_id",
   package_type: "Package Type",
   ticket_id: "Ticket ID",
   ticket_name: "Ticket Name",
@@ -215,10 +216,6 @@ const stockFieldMappings = {
   video_wall: "Video Wall",
   covered_seat: "Covered Seat",
   numbered_seat: "Numbered Seat",
-  delivery_days: "Delivery days",
-  ticket_description: "Ticket Description",
-  ticket_image_1: "Ticket image 1",
-  ticket_image_2: "Ticket Image 2",
 };
 
 // Define the field mappings for hotel data
@@ -294,6 +291,7 @@ const packageFieldMappings = {
   payment_date_1: "payment_date_1",
   payment_date_2: "payment_date_2",
   payment_date_3: "payment_date_3",
+  package_status: "package_status",
 };
 
 const userFieldMappings = {
@@ -543,7 +541,7 @@ async function triggerRunAllUpdates(sheetName) {
     case "users":
       action = "updateUsers";
       break;
-    case "stock-tickets":
+    case "newstock-tickets":
       action = "updateTickets";
       break;
     case "hotels":
@@ -579,7 +577,7 @@ async function triggerRunAllUpdates(sheetName) {
 
   try {
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbwWh0zq2dw-tru6ojEFCcfBgLBaQyFdblWkEs57IeoL4rqSb6Ql_wFEQX81DTFK0D9L/exec",
+      "https://script.google.com/macros/s/AKfycbzQWtEBn2qyT5lqSl-63A9r5COHRWBr1jLwXY-NP8J58kSCNJ2FCgnQRKAn6PQUesdE/exec",
       {
         action: action,
       }
@@ -635,7 +633,7 @@ router.post("/:sheetName", async (req, res, next) => {
       let fieldMappings;
       if (normalizedSheetName === "bookingfile") {
         fieldMappings = await getCachedData('bookingFieldMappings', () => bookingFieldMappings);
-      } else if (normalizedSheetName === "stock-tickets") {
+      } else if (normalizedSheetName === "newstock-tickets") {
         fieldMappings = await getCachedData('stockFieldMappings', () => stockFieldMappings);
       } else if (normalizedSheetName === "hotels") {
         fieldMappings = await getCachedData('hotelFieldMappings', () => hotelFieldMappings);
