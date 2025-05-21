@@ -352,6 +352,14 @@ const eventFieldMappings = {
   consultant_id: "Consultant ID",
 };
 
+const itineraryFieldMappings = {
+  booking_id: "Booking ID",
+  content: "Content",
+  generated_at: "Generated At",
+  created_at: "Created At",
+  updated_at: "Updated At"
+};
+
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
@@ -592,6 +600,12 @@ async function triggerRunAllUpdates(sheetName) {
     case "stock-loungepasses":
       action = "updateLoungePasses";
       break;
+    case "event":
+      action = "updateEvents";
+      break;
+    case "itineraries":
+      action = "updateItineraries";
+      break;
     default:
       action = "runAllUpdates";
   }
@@ -676,6 +690,8 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('loungePassFieldMappings', () => loungePassFieldMappings);
       } else if (normalizedSheetName === "event") {
         fieldMappings = await getCachedData('eventFieldMappings', () => eventFieldMappings);
+      } else if (normalizedSheetName === "itineraries") {
+        fieldMappings = await getCachedData('itineraryFieldMappings', () => itineraryFieldMappings);
       } else if (normalizedSheetName === "package-tiers") {
         fieldMappings = await getCachedData('tierFieldMappings', () => tierFieldMappings);
       } else {
