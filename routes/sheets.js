@@ -140,6 +140,7 @@ const bookingFieldMappings = {
   airport_transfer_id: "airport_transfer_id",
   airport_transfer_type: "Airport Transfer Type",
   airport_transfer_quantity: "airport_transfer_quantity",
+  airport_transfer_direction: "airport_transfer_direction",
   airport_transfer_cost: "Airport Transfer Cost",
   airport_transfer_price: "airport_transfer_price",
   circuit_transfer_id: "circuit_transfer_id",
@@ -292,6 +293,23 @@ const packageFieldMappings = {
   payment_date_2: "payment_date_2",
   payment_date_3: "payment_date_3",
   package_status: "package_status",
+};
+
+const categoryFieldMappings = {
+  event_name: "Event Name",
+  event_id: "Event ID",
+  category_id: "Category ID",
+  category_name: "Category Name",
+  gpgt_category_name: "GPGT Category Name",
+  package_type: "Package Type",
+  package_id: "Package ID",
+  ticket_delivery_days: "Ticket Delivery Days",
+  video_wall: "Video Wall",
+  covered_seat: "Covered Seat",
+  numbered_seat: "Numbered Seat",
+  category_info: "Category Info",
+  ticket_image_1: "Ticket image 1",
+  ticket_image_2: "Ticket image 2",
 };
 
 const userFieldMappings = {
@@ -556,6 +574,9 @@ async function triggerRunAllUpdates(sheetName) {
     case "packages":
       action = "updatePackages";
       break;
+    case "categories":
+      action = "updateCategories";
+      break;
     case "package-tiers":
       action = "updatePackageTiers";
       break;
@@ -577,7 +598,7 @@ async function triggerRunAllUpdates(sheetName) {
 
   try {
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbzQWtEBn2qyT5lqSl-63A9r5COHRWBr1jLwXY-NP8J58kSCNJ2FCgnQRKAn6PQUesdE/exec",
+      "https://script.google.com/macros/s/AKfycbynCyU_HmJ1WSduLq-SBJxWDF6UbZXtYmQstjo2RlvS-XWMuPuh0kZLSw3LIJ2irvU8/exec",
       {
         action: action,
       }
@@ -643,6 +664,8 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('packageFieldMappings', () => packageFieldMappings);
       } else if (normalizedSheetName === "users") {
         fieldMappings = await getCachedData('userFieldMappings', () => userFieldMappings);
+      } else if (normalizedSheetName === "categories") {
+        fieldMappings = await getCachedData('categoryFieldMappings', () => categoryFieldMappings);
       } else if (normalizedSheetName === "stock-rooms") {
         fieldMappings = await getCachedData('roomFieldMappings', () => roomFieldMappings);
       } else if (normalizedSheetName === "stock-circuittransfers") {
