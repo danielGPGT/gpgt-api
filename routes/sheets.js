@@ -292,7 +292,7 @@ const packageFieldMappings = {
   payment_date_1: "payment_date_1",
   payment_date_2: "payment_date_2",
   payment_date_3: "payment_date_3",
-  package_status: "package_status",
+  status: "status",
 };
 
 const categoryFieldMappings = {
@@ -338,6 +338,7 @@ const tierFieldMappings = {
   room_id: "room_id",
   circuit_transfer_id: "circuit_transfer_id",
   airport_transfer_id: "airport_transfer_id",
+  status: "status",
 };
 
 const eventFieldMappings = {
@@ -346,18 +347,26 @@ const eventFieldMappings = {
   event_id: "Event ID",
   event_start_date: "Event Start date",
   event_end_date: "Event End Date",
-  venue: "Venue",
-  city: "City",
-  venue_map: "Venue Map",
+  venue_id: "Venue ID",
   consultant_id: "Consultant ID",
+  status: "status",
+};
+
+const venueFieldMappings = {
+  venue_id: "Venue ID",
+  venue_name: "Venue Name",
+  city: "City",
+  country: "Country",
+  latitude: "Latitude",
+  longitude: "Longitude",
+  venue_info: "Venue Info"
 };
 
 const itineraryFieldMappings = {
   booking_id: "Booking ID",
   content: "Content",
   generated_at: "Generated At",
-  created_at: "Created At",
-  updated_at: "Updated At"
+  itinerary_id: "Itinerary ID",
 };
 
 // Add at the top of the file with other constants
@@ -603,6 +612,9 @@ async function triggerRunAllUpdates(sheetName) {
     case "event":
       action = "updateEvents";
       break;
+    case "venues":
+      action = "updateVenues";
+      break;
     case "itineraries":
       action = "updateItineraries";
       break;
@@ -612,7 +624,7 @@ async function triggerRunAllUpdates(sheetName) {
 
   try {
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbynCyU_HmJ1WSduLq-SBJxWDF6UbZXtYmQstjo2RlvS-XWMuPuh0kZLSw3LIJ2irvU8/exec",
+      "https://script.google.com/macros/s/AKfycbxTZrZburoNiOO89Qq66XyPoqO3lUwrV-qf3d7tBJK_yKDWDzqCkifJjhHSv1CTtQs/exec",
       {
         action: action,
       }
@@ -690,6 +702,8 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('loungePassFieldMappings', () => loungePassFieldMappings);
       } else if (normalizedSheetName === "event") {
         fieldMappings = await getCachedData('eventFieldMappings', () => eventFieldMappings);
+      } else if (normalizedSheetName === "venues") {
+        fieldMappings = await getCachedData('venueFieldMappings', () => venueFieldMappings);
       } else if (normalizedSheetName === "itineraries") {
         fieldMappings = await getCachedData('itineraryFieldMappings', () => itineraryFieldMappings);
       } else if (normalizedSheetName === "package-tiers") {
