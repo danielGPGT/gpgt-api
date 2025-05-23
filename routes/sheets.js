@@ -296,8 +296,7 @@ const packageFieldMappings = {
 };
 
 const categoryFieldMappings = {
-  event_name: "Event Name",
-  event_id: "Event ID",
+  venue_id: "Venue ID",
   category_id: "Category ID",
   category_name: "Category Name",
   gpgt_category_name: "GPGT Category Name",
@@ -591,7 +590,7 @@ async function triggerRunAllUpdates(sheetName) {
     case "packages":
       action = "updatePackages";
       break;
-    case "categories":
+    case "n-categories":
       action = "updateCategories";
       break;
     case "package-tiers":
@@ -624,7 +623,7 @@ async function triggerRunAllUpdates(sheetName) {
 
   try {
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbxTZrZburoNiOO89Qq66XyPoqO3lUwrV-qf3d7tBJK_yKDWDzqCkifJjhHSv1CTtQs/exec",
+      "https://script.google.com/macros/s/AKfycbw7qSiYtDnRLm8ENPXbFQONz6JcHdINEI7kB-ccMfiiPDCR0zvvuMKAecTs_jOAMF3w/exec",
       {
         action: action,
       }
@@ -690,7 +689,7 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('packageFieldMappings', () => packageFieldMappings);
       } else if (normalizedSheetName === "users") {
         fieldMappings = await getCachedData('userFieldMappings', () => userFieldMappings);
-      } else if (normalizedSheetName === "categories") {
+      } else if (normalizedSheetName === "n-categories") {
         fieldMappings = await getCachedData('categoryFieldMappings', () => categoryFieldMappings);
       } else if (normalizedSheetName === "stock-rooms") {
         fieldMappings = await getCachedData('roomFieldMappings', () => roomFieldMappings);
