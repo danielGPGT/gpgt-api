@@ -40,7 +40,7 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        const users = await readSheet('Users'); // Read users sheet
+        const users = await readSheet('users'); // Read users sheet
 
         const userIndex = users.findIndex(u => u.email && u.email.toLowerCase() === email.toLowerCase());
         const user = users[userIndex];
