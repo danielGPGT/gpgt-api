@@ -239,6 +239,7 @@ const hotelFieldMappings = {
   longitude: "Longitude",
   hotel_info: "Hotel Info",
   images: "Images",
+  currency: "currency",
 };
 
 const roomFieldMappings = {
