@@ -405,6 +405,11 @@ const itineraryFieldMappings = {
   itinerary_id: "Itinerary ID",
 };
 
+const spreadFieldMappings = {
+  spread_id: "Spread ID",
+  spread: "Spread",
+}
+
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
@@ -654,6 +659,9 @@ async function triggerRunAllUpdates(sheetName) {
     case "itineraries":
       action = "updateItineraries";
       break;
+    case "fx-spread":
+      action = "";
+      break;
     default:
       action = "runAllUpdates";
   }
@@ -744,6 +752,8 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('itineraryFieldMappings', () => itineraryFieldMappings);
       } else if (normalizedSheetName === "package-tiers") {
         fieldMappings = await getCachedData('tierFieldMappings', () => tierFieldMappings);
+      } else if (normalizedSheetName === "fx-spread") {
+        fieldMappings = await getCachedData('spreadFieldMappings', () => spreadFieldMappings);
       } else {
         return res.status(400).json({ error: "Unsupported sheet type" });
       }
