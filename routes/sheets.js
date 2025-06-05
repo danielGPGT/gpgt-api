@@ -410,6 +410,42 @@ const spreadFieldMappings = {
   spread: "Spread",
 }
 
+const circuitTransferFieldMappings = {
+  event_name: "Event Name",
+  package_id: "Package ID",
+  package_type: "Package Type",
+  hotel_id: "Hotel ID",
+  circuit_transfer_id: "Circuit Transfer ID",
+  hotel_name: "Hotel Name",
+  transport_type: "Transport Type",
+  used: "Used",
+  coach_capacity: "Coach capacity",
+  coaches_required: "Coaches required",
+  days: "Days",
+  quote_hours: "Quote hours",
+  expected_hours: "Expected hours",
+  provider_coach: "Provider (coach)",
+  cost_per_day_invoice_ccy: "cost per day (invoice ccy)",
+  cost_per_extra_hour_per_coach_per_day: "Cost per extra hour (per coach per day)",
+  vat_tax_if_not_included_in_price: "VAT/tax (if not included in price)",
+  parking_ticket_per_coach_per_day: "Parking ticket (per coach per day)",
+  currency: "Currency",
+  coach_cost_local: "Coach cost local",
+  coach_cost_gbp: "Coach Cost GBP",
+  guide_included_in_coach_cost: "Guide included in coach cost",
+  guide_cost_per_day: "guide cost per day",
+  cost_per_extra_hour_per_guide_per_day: "Cost per extra hour (per guide per day)",
+  vat_tax_if_not_included_in_price_guide: "VAT/tax (if not included in guide price)",
+  guide_cost_local: "Guide cost local",
+  guide_cost_gbp: "Guide Cost (GBP)",
+  provider_guides: "Provider (Guides)",
+  utilisation_percent: "Utilisation %",
+  utilisation_cost_per_seat_local: "Utilisation cost per seat (Local)",
+  utilisation_cost_per_seat_gbp: "Utilisation cost per seat (GBP)",
+  selling_for_gbp: "Selling for GBP",
+  markup: "markup"
+};
+
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
@@ -639,7 +675,7 @@ async function triggerRunAllUpdates(sheetName) {
       action = "updatePackageTiers";
       break;
     case "stock-circuittransfers":
-      action = "updateCircuitTransfers";
+      action = "";
       break;
     case "stock-flights":
       action = "updateFlights";
