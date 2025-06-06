@@ -298,7 +298,10 @@ const loungePassFieldMappings = {
 };
 
 const airportTransferFieldMappings = {
+  event_id: "Event ID",
   event_name: "Event Name",
+  package_id: "Package ID",
+  package_type: "Package Type",
   hotel_id: "Hotel ID",
   airport_transfer_id: "Airport Transfer ID",
   hotel_name: "Hotel Name",
@@ -308,12 +311,12 @@ const airportTransferFieldMappings = {
   total_budget: "Total Budget",
   budget_per_car: "Budget per car",
   supplier: "Supplier",
-  supplier_quote_local: "Supplier quote per car (local)",
-  quote_currency: "Quote Currency (ISO Code only)",
-  supplier_quote_gbp: "Supplier quote per car (GBP)",
+  quote_currency: "Quote Currency",
+  supplier_quote_per_car_local: "Supplier quote per car local",
+  supplier_quote_per_car_gbp: "Supplier quote per car GBP",
   diff: "diff",
   total_diff: "Total diff",
-  total_owing: "Total Owing to Supplier",
+  total_owing_to_supplier: "Total Owing to Supplier",
   paid_to_supplier: "Paid to Supplier",
   outstanding: "Outstanding",
   markup: "Markup"
@@ -681,7 +684,7 @@ async function triggerRunAllUpdates(sheetName) {
       action = "updateFlights";
       break;
     case "stock-airporttransfers":
-      action = "updateAirportTransfers";
+      action = "";
       break;
     case "stock-loungepasses":
       action = "updateLoungePasses";
