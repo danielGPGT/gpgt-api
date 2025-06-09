@@ -221,8 +221,6 @@ const stockFieldMappings = {
 
 // Define the field mappings for hotel data
 const hotelFieldMappings = {
-  event_name: "Event Name",
-  package_id: "Package ID",
   hotel_id: "Hotel ID",
   hotel_name: "Hotel Name",
   stars: "Stars",
@@ -243,8 +241,12 @@ const hotelFieldMappings = {
 };
 
 const roomFieldMappings = {
-  hotel_id: "Hotel ID",
   room_id: "Room ID",
+  hotel_id: "Hotel ID",
+  event_id: "Event ID",
+  event_name: "Event Name",
+  package_id: "Package ID",
+  package_type: "Package Type",
   hotel_name: "Hotel Name",
   room_category: "Room Category",
   room_type: "Room Type",
@@ -659,10 +661,10 @@ async function triggerRunAllUpdates(sheetName) {
     case "newstock-tickets":
       action = "updateTickets";
       break;
-    case "hotels":
+    case "testhotels":
       action = "updateHotels";
       break;
-    case "stock-rooms":
+    case "teststock-rooms":
       action = "updateRooms";
       break;
     case "event":
@@ -765,7 +767,7 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('bookingFieldMappings', () => bookingFieldMappings);
       } else if (normalizedSheetName === "newstock-tickets") {
         fieldMappings = await getCachedData('stockFieldMappings', () => stockFieldMappings);
-      } else if (normalizedSheetName === "hotels") {
+      } else if (normalizedSheetName === "testhotels") {
         fieldMappings = await getCachedData('hotelFieldMappings', () => hotelFieldMappings);
       } else if (normalizedSheetName === "stock-flights") {
         fieldMappings = await getCachedData('flightFieldMappings', () => flightFieldMappings);
@@ -775,7 +777,7 @@ router.post("/:sheetName", async (req, res, next) => {
         fieldMappings = await getCachedData('userFieldMappings', () => userFieldMappings);
       } else if (normalizedSheetName === "n-categories") {
         fieldMappings = await getCachedData('categoryFieldMappings', () => categoryFieldMappings);
-      } else if (normalizedSheetName === "stock-rooms") {
+      } else if (normalizedSheetName === "teststock-rooms") {
         fieldMappings = await getCachedData('roomFieldMappings', () => roomFieldMappings);
       } else if (normalizedSheetName === "stock-circuittransfers") {
         fieldMappings = await getCachedData('circuitTransferFieldMappings', () => circuitTransferFieldMappings);
@@ -833,7 +835,41 @@ router.post("/:sheetName", async (req, res, next) => {
 // PUT route to update a single cell in a specific sheet
 router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
+  
+  // Validate URL parameters
+  if (!sheetName || typeof sheetName !== 'string') {
+    return res.status(400).json({ error: "Valid sheet name is required" });
+  }
+  
+  if (!idColumn || typeof idColumn !== 'string') {
+    return res.status(400).json({ error: "Valid ID column name is required" });
+  }
+  
+  if (!idValue || typeof idValue !== 'string') {
+    return res.status(400).json({ error: "Valid ID value is required" });
+  }
+  
+  // Validate request body
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ error: "Request body is required and must be an object" });
+  }
+  
   const { column, value } = req.body;
+  
+  // Validate required fields
+  if (!column || typeof column !== 'string') {
+    return res.status(400).json({ error: "Column name is required and must be a string" });
+  }
+
+  // Validate value (can be null, string, number, or boolean)
+  if (value !== null && value !== undefined && 
+      typeof value !== 'string' && 
+      typeof value !== 'number' && 
+      typeof value !== 'boolean') {
+    return res.status(400).json({ 
+      error: "Value must be a string, number, boolean, or null" 
+    });
+  }
 
   // Convert empty string to null
   const processedValue = value === "" ? null : value;
