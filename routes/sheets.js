@@ -44,7 +44,6 @@ if (!spreadsheetId) {
 // Add caching
 const cache = {
     headers: new Map(),
-    fieldMappings: new Map(),
     lastUpdated: new Map(),
     CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
 };
@@ -83,373 +82,109 @@ async function batchUpdate(sheetName, updates) {
   });
 }
 
-// Define the field mappings for booking data
-const bookingFieldMappings = {
-  // Primary key
-  booking_id: "booking_id",
+// Helper function to find row by ID
+async function findRowById(sheets, sheetName, idColumn, idValue) {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${sheetName}'!A:ZZ`,
+  });
 
-  // Status and reference fields
-  status: "status",
-  booking_ref: "booking_ref",
-  booking_type: "booking_type",
-  consultant: "consultant",
-  acquisition: "acquisition",
-  event_id: "event_id",
-  sport: "Sport",
-  event_name: "Event Name",
-  package_id: "package_id",
-  package_type: "Package Type",
-  atol_abtot: "atol_abtot",
-  booking_date: "booking_date",
+  const rows = response.data.values;
+  if (!rows || rows.length === 0) return null;
 
-  // Booker information
-  booker_name: "booker_name",
-  booker_email: "booker_email",
-  booker_phone: "booker_phone",
-  booker_address: "booker_address",
+  const headers = rows[0];
+  const idColumnIndex = headers.indexOf(idColumn);
+  if (idColumnIndex === -1) return null;
 
-  // Traveller information
-  lead_traveller_name: "lead_traveller_name",
-  lead_traveller_email: "lead_traveller_email",
-  lead_traveller_phone: "lead_traveller_phone",
-  guest_traveller_names: "guest_traveller_names",
-  adults: "adults",
-
-  // Ticket information
-  ticket_id: "ticket_id",
-  ticket_name: "Ticket Name",
-  ticket_quantity: "ticket_quantity",
-  ticket_cost: "Ticket Cost",
-  ticket_price: "ticket_price",
-
-  // Hotel information
-  hotel_id: "hotel_id",
-  hotel_name: "Hotel Name",
-  room_id: "room_id",
-  room_category: "Room Category",
-  room_type: "Room Type",
-  check_in_date: "check_in_date",
-  check_out_date: "check_out_date",
-  nights: "nights",
-  extra_nights: "extra_nights",
-  room_quantity: "room_quantity",
-  room_cost: "Room Cost",
-  room_price: "room_price",
-
-  // Transfer information
-  airport_transfer_id: "airport_transfer_id",
-  airport_transfer_type: "Airport Transfer Type",
-  airport_transfer_quantity: "airport_transfer_quantity",
-  airport_transfer_direction: "airport_transfer_direction",
-  airport_transfer_cost: "Airport Transfer Cost",
-  airport_transfer_price: "airport_transfer_price",
-  circuit_transfer_id: "circuit_transfer_id",
-  circuit_transfer_type: "Circuit Transfer Type",
-  circuit_transfer_quantity: "circuit_transfer_quantity",
-  circuit_transfer_cost: "Circuit Transfer Cost",
-  circuit_transfer_price: "circuit_transfer_price",
-
-  // Flight information
-  flight_id: "flight_id",
-  flight_outbound: "Flight Outbound",
-  flight_inbound: "Flight Inbound",
-  flight_class: "Flight Class",
-  flight_carrier: "Flight Carrier",
-  flight_source: "Flight Source",
-  flight_booking_reference: "flight_booking_reference",
-  ticketing_deadline: "ticketing_deadline",
-  flight_status: "flight_status",
-  flight_quantity: "flight_quantity",
-  flight_cost: "Flight Cost",
-  flight_price: "flight_price",
-
-  // Lounge pass information
-  lounge_pass_id: "lounge_pass_id",
-  lounge_pass_variant: "Lounge Pass Variant",
-  lounge_booking_reference: "lounge_booking_reference",
-  lounge_pass_quantity: "lounge_pass_quantity",
-  lounge_pass_cost: "Lounge Pass Cost",
-  lounge_pass_price: "lounge_pass_price",
-
-  // Payment information
-  payment_currency: "payment_currency",
-  payment_1: "payment_1",
-  payment_1_date: "payment_1_date",
-  payment_1_status: "payment_1_status",
-  payment_2: "payment_2",
-  payment_2_date: "payment_2_date",
-  payment_2_status: "payment_2_status",
-  payment_3: "payment_3",
-  payment_3_date: "payment_3_date",
-  payment_3_status: "payment_3_status",
-  amount_due: "Amount Due",
-  payment_status: "Payment Status",
-  total_cost: "Total Cost",
-  total_sold_local: "Total Sold For Local",
-  total_sold_gbp: "Total Sold GBP",
-  pnl: "P&L",
-};
-
-// Define the field mappings for stock/ticket data
-const stockFieldMappings = {
-  event: "Event",
-  category_id: "category_id",
-  package_type: "Package Type",
-  ticket_id: "Ticket ID",
-  ticket_name: "Ticket Name",
-  supplier: "Supplier",
-  ref: "Ref",
-  actual_stock: "Actual stock",
-  used: "Used",
-  remaining: "Remaining",
-  currency_bought_in: "Currency (Bought in)",
-  unit_cost_local: "Unit Cost (Local)",
-  unit_cost_gbp: "Unit Cost (GBP)",
-  total_cost_local: "Total Cost  (Local)",
-  total_cost_gbp: "Total Cost (GBP)",
-  is_provsional: "Is Provsional",
-  ordered: "Ordered",
-  paid: "Paid",
-  tickets_received: "Tickets Received",
-  markup: "Markup",
-  event_days: "Event Days",
-  ticket_type: "Ticket Type",
-  video_wall: "Video Wall",
-  covered_seat: "Covered Seat",
-  numbered_seat: "Numbered Seat",
-};
-
-// Define the field mappings for hotel data
-const hotelFieldMappings = {
-  hotel_id: "Hotel ID",
-  hotel_name: "Hotel Name",
-  stars: "Stars",
-  package_type: "Package Type",
-  city_tax_type: "City Tax Type",
-  city_tax_value: "City Tax Value",
-  city_tax_amount: "City Tax Amount",
-  vat_type: "VAT Type",
-  vat_amount: "VAT Amount",
-  commission: "Commission",
-  resort_fee: "Resort Fee (Per Night)",
-  other_rates: "Other Rates",
-  latitude: "Latitude",
-  longitude: "Longitude",
-  hotel_info: "Hotel Info",
-  images: "Images",
-  currency: "currency",
-};
-
-const roomFieldMappings = {
-  room_id: "Room ID",
-  hotel_id: "Hotel ID",
-  event_id: "Event ID",
-  event_name: "Event Name",
-  package_id: "Package ID",
-  package_type: "Package Type",
-  hotel_name: "Hotel Name",
-  room_category: "Room Category",
-  room_type: "Room Type",
-  source: "Source",
-  room_flexibility: "Room Flexibility",
-  max_guests: "Max Guests",
-  booked: "Booked",
-  used: "Used",
-  remaining: "Remaining",
-  check_in_date: "Check In Date",
-  check_out_date: "Check Out Date",
-  nights: "Nights",
-  currency_local: "Currency (Local)",
-  breakfast_included: "Breakfast Included",
-  breakfast_cost_pp: "Breakfast Cost PP",
-  core_per_night_price_local: "Core per night price Local",
-  final_per_night_price_local: "Final Per Night Price Local",
-  price_per_night_gbp: "Price Per Night (GBP)",
-  extra_night_price_gbp: "Extra Night Price (GBP)",
-  total_room_cost_gbp: "Total Room Cost (GBP)",
-  room_margin: "Room Margin",
-  extra_night_margin: "Extra Night Margin",
-  attrition_group: "Attrition Group"
-};
-
-const flightFieldMappings = {
-  event_id: "Event ID",
-  event_name: "Event Name",
-  flight_id: "Flight ID",
-  outbound_flight: "Outbound Flight",
-  inbound_flight: "Inbound Flight",
-  airline: "Airline",
-  class: "Class",
-  from_location: "From Location",
-  cost: "Cost",
-  margin: "Margin",
-  booking_reference: "Booking Reference",
-  currency: "Currency",
-  source: "Source",
-  used: "Used",
-};
-
-const loungePassFieldMappings = {
-  event: "Event",
-  event_id: "Event ID",
-  lounge_pass_id: "Lounge Pass ID",
-  variant: "Variant",
-  used: "Used",
-  cost: "Cost",
-  margin: "Margin"
-};
-
-const airportTransferFieldMappings = {
-  event_id: "Event ID",
-  event_name: "Event Name",
-  package_id: "Package ID",
-  package_type: "Package Type",
-  hotel_id: "Hotel ID",
-  airport_transfer_id: "Airport Transfer ID",
-  hotel_name: "Hotel Name",
-  transport_type: "Transport Type",
-  max_capacity: "Max Capacity",
-  used: "Used",
-  total_budget: "Total Budget",
-  budget_per_car: "Budget per car",
-  supplier: "Supplier",
-  quote_currency: "Quote Currency",
-  supplier_quote_per_car_local: "Supplier quote per car local",
-  supplier_quote_per_car_gbp: "Supplier quote per car GBP",
-  diff: "diff",
-  total_diff: "Total diff",
-  total_owing_to_supplier: "Total Owing to Supplier",
-  paid_to_supplier: "Paid to Supplier",
-  outstanding: "Outstanding",
-  markup: "Markup"
-};
-
-const packageFieldMappings = {
-  event: "Event",
-  event_id: "Event ID",
-  package_id: "Package ID",
-  package_name: "Package Name",
-  package_type: "Package Type",
-  url: "url",
-  payment_date_1: "payment_date_1",
-  payment_date_2: "payment_date_2",
-  payment_date_3: "payment_date_3",
-  status: "status",
-};
-
-const categoryFieldMappings = {
-  venue_id: "Venue ID",
-  category_id: "Category ID",
-  category_name: "Category Name",
-  gpgt_category_name: "GPGT Category Name",
-  package_type: "Package Type",
-  package_id: "Package ID",
-  ticket_delivery_days: "Ticket Delivery Days",
-  video_wall: "Video Wall",
-  covered_seat: "Covered Seat",
-  numbered_seat: "Numbered Seat",
-  category_info: "Category Info",
-  ticket_image_1: "Ticket image 1",
-  ticket_image_2: "Ticket image 2",
-};
-
-const userFieldMappings = {
-  email: "Email",
-  phone: "Phone",
-  password: "Password",
-  role: "Role",
-  first_name: "First Name",
-  last_name: "Last Name",
-  company: "Company",
-  login_count: "login_count",
-  last_login: "last_login",
-  b2b_commission: "b2b_commission",
-  user_id: "User ID",
-  avatar: "avatar",
-};
-
-const tierFieldMappings = {
-  package_name: "package_name",
-  package_id: "package_id",
-  tier_id: "tier_id",
-  tier_type: "tier_type",
-  ticket_id: "ticket_id",
-  ticket_name: "ticket_name",
-  hotel_id: "hotel_id",
-  room_id: "room_id",
-  circuit_transfer_id: "circuit_transfer_id",
-  airport_transfer_id: "airport_transfer_id",
-  status: "status",
-};
-
-const eventFieldMappings = {
-  sport: "Sport",
-  event: "Event",
-  event_id: "Event ID",
-  event_start_date: "Event Start date",
-  event_end_date: "Event End Date",
-  venue_id: "Venue ID",
-  consultant_id: "Consultant ID",
-  status: "status",
-};
-
-const venueFieldMappings = {
-  venue_id: "Venue ID",
-  venue_name: "Venue Name",
-  city: "City",
-  country: "Country",
-  latitude: "Latitude",
-  longitude: "Longitude",
-  venue_info: "Venue Info"
-};
-
-const itineraryFieldMappings = {
-  booking_id: "Booking ID",
-  content: "Content",
-  generated_at: "Generated At",
-  itinerary_id: "Itinerary ID",
-};
-
-const spreadFieldMappings = {
-  spread_id: "Spread ID",
-  spread: "Spread",
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][idColumnIndex] === idValue) {
+      return i + 1; // Return 1-based row number
+    }
+  }
+  return null;
 }
 
-const circuitTransferFieldMappings = {
-  event_name: "Event Name",
-  package_id: "Package ID",
-  package_type: "Package Type",
-  hotel_id: "Hotel ID",
-  circuit_transfer_id: "Circuit Transfer ID",
-  hotel_name: "Hotel Name",
-  transport_type: "Transport Type",
-  used: "Used",
-  coach_capacity: "Coach capacity",
-  coaches_required: "Coaches required",
-  days: "Days",
-  quote_hours: "Quote hours",
-  expected_hours: "Expected hours",
-  provider_coach: "Provider (coach)",
-  cost_per_day_invoice_ccy: "cost per day (invoice ccy)",
-  cost_per_extra_hour_per_coach_per_day: "Cost per extra hour (per coach per day)",
-  vat_tax_if_not_included_in_price: "VAT/tax (if not included in price)",
-  parking_ticket_per_coach_per_day: "Parking ticket (per coach per day)",
-  currency: "Currency",
-  coach_cost_local: "Coach cost local",
-  coach_cost_gbp: "Coach Cost GBP",
-  guide_included_in_coach_cost: "Guide included in coach cost",
-  guide_cost_per_day: "guide cost per day",
-  cost_per_extra_hour_per_guide_per_day: "Cost per extra hour (per guide per day)",
-  vat_tax_if_not_included_in_price_guide: "VAT/tax (if not included in guide price)",
-  guide_cost_local: "Guide cost local",
-  guide_cost_gbp: "Guide Cost (GBP)",
-  provider_guides: "Provider (Guides)",
-  utilisation_percent: "Utilisation %",
-  utilisation_cost_per_seat_local: "Utilisation cost per seat (Local)",
-  utilisation_cost_per_seat_gbp: "Utilisation cost per seat (GBP)",
-  selling_for_gbp: "Selling for GBP",
-  markup: "markup"
-};
+// Helper function to trigger Google Apps Script updates
+async function triggerRunAllUpdates(sheetName) {
+  const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
+  let action;
+
+  // Determine the action based on the sheet name
+  switch (normalizedSheetName) {
+    case "users":
+      action = "updateUsers";
+      break;
+    case "newstock-tickets":
+      action = "updateTickets";
+      break;
+    case "testhotels":
+      action = "updateHotels";
+      break;
+    case "teststock-rooms":
+      action = "updateRooms";
+      break;
+    case "event":
+      action = "updateEvents";
+      break;
+    case "packages":
+      action = "updatePackages";
+      break;
+    case "n-categories":
+      action = "updateCategories";
+      break;
+    case "package-tiers":
+      action = "updatePackageTiers";
+      break;
+    case "stock-circuittransfers":
+      action = "";
+      break;
+    case "stock-flights":
+      action = "updateFlights";
+      break;
+    case "stock-airporttransfers":
+      action = "";
+      break;
+    case "stock-loungepasses":
+      action = "updateLoungePasses";
+      break;
+    case "event":
+      action = "updateEvents";
+      break;
+    case "venues":
+      action = "updateVenues";
+      break;
+    case "itineraries":
+      action = "updateItineraries";
+      break;
+    case "fx-spread":
+      action = "";
+      break;
+    default:
+      action = "runAllUpdates";
+  }
+
+  try {
+    const response = await axios.post(
+      "https://script.google.com/macros/s/AKfycbw7qSiYtDnRLm8ENPXbFQONz6JcHdINEI7kB-ccMfiiPDCR0zvvuMKAecTs_jOAMF3w/exec",
+      {
+        action: action,
+      }
+    );
+    console.log(`${action} triggered:`, response.data);
+  } catch (error) {
+    console.error(`Error triggering ${action || 'update'}:`, error.message);
+  }
+}
+
+// Helper function to convert column index to letter (0 = A, 1 = B, 26 = AA, etc.)
+function columnIndexToLetter(index) {
+  let letter = "";
+  while (index >= 0) {
+    letter = String.fromCharCode(65 + (index % 26)) + letter;
+    index = Math.floor(index / 26) - 1;
+  }
+  return letter;
+}
 
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
@@ -566,170 +301,6 @@ router.get("/:sheetName", async (req, res, next) => {
   }
 });
 
-// Helper function to find row by ID
-async function findRowById(sheets, sheetName, idColumn, idValue) {
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `'${sheetName}'!A:ZZ`,
-  });
-
-  const rows = response.data.values;
-  if (!rows || rows.length === 0) return null;
-
-  const headers = rows[0];
-  const idColumnIndex = headers.indexOf(idColumn);
-  if (idColumnIndex === -1) return null;
-
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][idColumnIndex] === idValue) {
-      return i + 1; // Return 1-based row number
-    }
-  }
-  return null;
-}
-
-// GET route to read data from a specific sheet
-router.get("/:sheetName", async (req, res, next) => {
-  const { sheetName } = req.params;
-  const { id, idColumn } = req.query;
-
-  try {
-    const sheets = google.sheets({ version: "v4", auth });
-
-    if (id && idColumn) {
-      // Get specific row by ID
-      const rowNumber = await findRowById(sheets, sheetName, idColumn, id);
-      if (!rowNumber) {
-        return res.status(404).json({ error: "Item not found" });
-      }
-
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `'${sheetName}'!A${rowNumber}:ZZ${rowNumber}`, // Changed to A:ZZ
-      });
-
-      const headers = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `'${sheetName}'!A1:ZZ1`, // Changed to A:ZZ
-      });
-
-      const row = response.data.values[0];
-      const result = {};
-      headers.data.values[0].forEach((header, index) => {
-        result[header] = row[index];
-      });
-
-      res.json(result);
-    } else {
-      // Get all data
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `'${sheetName}'!A:ZZ`, // Changed to A:ZZ
-      });
-
-      const rows = response.data.values;
-      if (!rows || rows.length === 0) {
-        return res.json([]);
-      }
-
-      const headers = rows[0];
-      const data = rows.slice(1).map((row) => {
-        const item = {};
-        headers.forEach((header, index) => {
-          item[header] = row[index];
-        });
-        return item;
-      });
-
-      res.json(data);
-    }
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Helper function to trigger Google Apps Script updates
-async function triggerRunAllUpdates(sheetName) {
-  const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
-  let action;
-
-  // Determine the action based on the sheet name
-  switch (normalizedSheetName) {
-    case "users":
-      action = "updateUsers";
-      break;
-    case "newstock-tickets":
-      action = "updateTickets";
-      break;
-    case "testhotels":
-      action = "updateHotels";
-      break;
-    case "teststock-rooms":
-      action = "updateRooms";
-      break;
-    case "event":
-      action = "updateEvents";
-      break;
-    case "packages":
-      action = "updatePackages";
-      break;
-    case "n-categories":
-      action = "updateCategories";
-      break;
-    case "package-tiers":
-      action = "updatePackageTiers";
-      break;
-    case "stock-circuittransfers":
-      action = "";
-      break;
-    case "stock-flights":
-      action = "updateFlights";
-      break;
-    case "stock-airporttransfers":
-      action = "";
-      break;
-    case "stock-loungepasses":
-      action = "updateLoungePasses";
-      break;
-    case "event":
-      action = "updateEvents";
-      break;
-    case "venues":
-      action = "updateVenues";
-      break;
-    case "itineraries":
-      action = "updateItineraries";
-      break;
-    case "fx-spread":
-      action = "";
-      break;
-    default:
-      action = "runAllUpdates";
-  }
-
-  try {
-    const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbw7qSiYtDnRLm8ENPXbFQONz6JcHdINEI7kB-ccMfiiPDCR0zvvuMKAecTs_jOAMF3w/exec",
-      {
-        action: action,
-      }
-    );
-    console.log(`${action} triggered:`, response.data);
-  } catch (error) {
-    console.error(`Error triggering ${action || 'update'}:`, error.message);
-  }
-}
-
-// Helper function to convert column index to letter (0 = A, 1 = B, 26 = AA, etc.)
-function columnIndexToLetter(index) {
-  let letter = "";
-  while (index >= 0) {
-    letter = String.fromCharCode(65 + (index % 26)) + letter;
-    index = Math.floor(index / 26) - 1;
-  }
-  return letter;
-}
-
 // POST route to write data to a specific sheet
 router.post("/:sheetName", async (req, res, next) => {
   const { sheetName } = req.params;
@@ -759,58 +330,13 @@ router.post("/:sheetName", async (req, res, next) => {
         }
       });
     } else {
-      const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
-      console.log("Original sheet name:", sheetName);
-      console.log("Normalized sheet name:", normalizedSheetName);
-      let fieldMappings;
-      if (normalizedSheetName === "bookingfile") {
-        fieldMappings = await getCachedData('bookingFieldMappings', () => bookingFieldMappings);
-      } else if (normalizedSheetName === "newstock-tickets") {
-        fieldMappings = await getCachedData('stockFieldMappings', () => stockFieldMappings);
-      } else if (normalizedSheetName === "testhotels") {
-        fieldMappings = await getCachedData('hotelFieldMappings', () => hotelFieldMappings);
-      } else if (normalizedSheetName === "stock-flights") {
-        fieldMappings = await getCachedData('flightFieldMappings', () => flightFieldMappings);
-      } else if (normalizedSheetName === "packages") {
-        fieldMappings = await getCachedData('packageFieldMappings', () => packageFieldMappings);
-      } else if (normalizedSheetName === "users") {
-        fieldMappings = await getCachedData('userFieldMappings', () => userFieldMappings);
-      } else if (normalizedSheetName === "n-categories") {
-        fieldMappings = await getCachedData('categoryFieldMappings', () => categoryFieldMappings);
-      } else if (normalizedSheetName === "teststock-rooms") {
-        fieldMappings = await getCachedData('roomFieldMappings', () => roomFieldMappings);
-      } else if (normalizedSheetName === "stock-circuittransfers") {
-        fieldMappings = await getCachedData('circuitTransferFieldMappings', () => circuitTransferFieldMappings);
-      } else if (normalizedSheetName === "stock-airporttransfers") {
-        fieldMappings = await getCachedData('airportTransferFieldMappings', () => airportTransferFieldMappings);
-      } else if (normalizedSheetName === "stock-loungepasses") {
-        fieldMappings = await getCachedData('loungePassFieldMappings', () => loungePassFieldMappings);
-      } else if (normalizedSheetName === "event") {
-        fieldMappings = await getCachedData('eventFieldMappings', () => eventFieldMappings);
-      } else if (normalizedSheetName === "venues") {
-        fieldMappings = await getCachedData('venueFieldMappings', () => venueFieldMappings);
-      } else if (normalizedSheetName === "itineraries") {
-        fieldMappings = await getCachedData('itineraryFieldMappings', () => itineraryFieldMappings);
-      } else if (normalizedSheetName === "package-tiers") {
-        fieldMappings = await getCachedData('tierFieldMappings', () => tierFieldMappings);
-      } else if (normalizedSheetName === "fx-spread") {
-        fieldMappings = await getCachedData('spreadFieldMappings', () => spreadFieldMappings);
-      } else {
-        return res.status(400).json({ error: "Unsupported sheet type" });
-      }
-
       // Map the incoming data to the correct positions based on headers
       for (const [field, value] of Object.entries(req.body)) {
-        const columnName = fieldMappings[field];
-        if (columnName) {
-          const columnIndex = headers.indexOf(columnName);
+        const columnIndex = headers.indexOf(field);
           if (columnIndex !== -1) {
             rowData[columnIndex] = value;
-          } else {
-            console.log(`Column ${columnName} not found in headers`);
-          }
         } else {
-          console.log(`No mapping found for field ${field}`);
+          console.log(`Column ${field} not found in headers`);
         }
       }
     }
@@ -901,24 +427,11 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
       return res.status(404).json({ error: "Item not found" });
     }
 
-    // Handle column mapping
-    let columnToUpdate = column;
-    const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
-    if (normalizedSheetName === "bookingfile") {
-      const fieldMappings = await getCachedData('bookingFieldMappings', () => bookingFieldMappings);
-      for (const [field, sheetColumn] of Object.entries(fieldMappings)) {
-        if (field === column) {
-          columnToUpdate = sheetColumn;
-          break;
-        }
-      }
-    }
-
-    const columnIndex = headers.indexOf(columnToUpdate);
+    const columnIndex = headers.indexOf(column);
     if (columnIndex === -1) {
       pendingUpdates.delete(updateKey);
       return res.status(400).json({
-        error: `Column '${columnToUpdate}' not found in sheet. Available columns: ${headers.join(", ")}`,
+        error: `Column '${column}' not found in sheet. Available columns: ${headers.join(", ")}`,
       });
     }
 
