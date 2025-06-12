@@ -14,7 +14,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://glowing-sundae-f3e045.netlify.app', 'https://portal.grandprixgrandtours.com/'],
+    origin: ['http://localhost:5173', 'https://glowing-sundae-f3e045.netlify.app', 'https://portal.grandprixgrandtours.com'],
     credentials: true
 }));
 
