@@ -189,7 +189,34 @@ function columnIndexToLetter(index) {
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
-// GET route to fetch data for a specific sheet
+// GET route for getting a single booking by ID (more specific route)
+router.get("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
+  const { sheetName, idColumn, idValue } = req.params;
+
+  try {
+    const data = await readSheet(sheetName);
+    if (!data) {
+      return res
+        .status(404)
+        .json({ error: `No data found in sheet: ${sheetName}` });
+    }
+
+    // Find the booking with matching ID
+    const booking = data.find(item => item[idColumn] === idValue);
+    
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ error: `No booking found with ${idColumn}: ${idValue}` });
+    }
+
+    res.status(200).json(booking);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET route to fetch data for a specific sheet (more general route)
 router.get("/:sheetName", async (req, res, next) => {
   const { sheetName } = req.params;
   const {
@@ -456,6 +483,78 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
     next(error);
   } finally {
     pendingUpdates.delete(updateKey);
+  }
+});
+
+// Add new bulk update endpoint
+router.put("/:sheetName/:idColumn/:idValue/bulk", async (req, res, next) => {
+  const { sheetName, idColumn, idValue } = req.params;
+  
+  // Validate URL parameters
+  if (!sheetName || typeof sheetName !== 'string') {
+    return res.status(400).json({ error: "Valid sheet name is required" });
+  }
+  
+  if (!idColumn || typeof idColumn !== 'string') {
+    return res.status(400).json({ error: "Valid ID column name is required" });
+  }
+  
+  if (!idValue || typeof idValue !== 'string') {
+    return res.status(400).json({ error: "Valid ID value is required" });
+  }
+  
+  // Validate request body
+  if (!req.body || !Array.isArray(req.body)) {
+    return res.status(400).json({ error: "Request body must be an array of updates" });
+  }
+
+  try {
+    // Get headers from cache
+    const headers = await getCachedData(`headers-${sheetName}`, async () => {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${sheetName}'!A1:ZZ1`,
+      });
+      return response.data.values[0];
+    });
+
+    // Find row number
+    const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
+    if (!rowNumber) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    // Prepare batch updates
+    const batchUpdates = req.body.map(update => {
+      const { column, value } = update;
+      
+      // Validate column exists
+      const columnIndex = headers.indexOf(column);
+      if (columnIndex === -1) {
+        throw new Error(`Column '${column}' not found in sheet`);
+      }
+
+      const columnLetter = columnIndexToLetter(columnIndex);
+      return {
+        range: `${columnLetter}${rowNumber}`,
+        value: value === "" ? null : value
+      };
+    });
+
+    // Execute batch update
+    await batchUpdate(sheetName, batchUpdates);
+
+    // Trigger updates in parallel
+    await Promise.all([
+      triggerRunAllUpdates(sheetName),
+      // Clear cache for this sheet
+      cache.headers.delete(`headers-${sheetName}`)
+    ]);
+
+    res.json({ message: "Bulk update completed successfully" });
+  } catch (error) {
+    console.error("Error in bulk update:", error);
+    next(error);
   }
 });
 
