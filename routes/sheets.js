@@ -114,7 +114,7 @@ async function triggerRunAllUpdates(sheetName) {
     case "users":
       action = "updateUsers";
       break;
-    case "newstock-tickets":
+    case "stock-tickets":
       action = "updateTickets";
       break;
     case "testhotels":
