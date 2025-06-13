@@ -111,61 +111,19 @@ async function triggerRunAllUpdates(sheetName) {
 
   // Determine the action based on the sheet name
   switch (normalizedSheetName) {
-    case "users":
-      action = "updateUsers";
-      break;
     case "stock-tickets":
       action = "updateTickets";
       break;
-    case "testhotels":
-      action = "updateHotels";
-      break;
-    case "teststock-rooms":
-      action = "updateRooms";
-      break;
-    case "event":
-      action = "updateEvents";
-      break;
-    case "packages":
-      action = "updatePackages";
-      break;
-    case "n-categories":
-      action = "updateCategories";
-      break;
-    case "package-tiers":
-      action = "updatePackageTiers";
-      break;
-    case "stock-circuittransfers":
-      action = "";
-      break;
-    case "stock-flights":
-      action = "updateFlights";
-      break;
-    case "stock-airporttransfers":
-      action = "";
-      break;
-    case "stock-loungepasses":
-      action = "updateLoungePasses";
-      break;
-    case "event":
-      action = "updateEvents";
-      break;
-    case "venues":
-      action = "updateVenues";
-      break;
-    case "itineraries":
-      action = "updateItineraries";
-      break;
-    case "fx-spread":
-      action = "";
+    case "bookingfile":
+      action = "runAllUpdates";
       break;
     default:
-      action = "runAllUpdates";
+      action = "";
   }
 
   try {
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbxQA2pSDGZIkRZViGagSG12XP4446dT0oS1EhSoYXnzny5cDKt-izoWOLcVmy52L4-V/exec",
+      "https://script.google.com/macros/s/AKfycbygwPT6tH0rh2U_6T4f9EF0nnhALZWd0cRiiDnYQc6uGnnyAOttHyF-hk6rQNdS5Ab7/exec",
       {
         action: action,
       }
