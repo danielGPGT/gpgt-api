@@ -124,7 +124,7 @@ async function triggerRunAllUpdates(sheetName) {
 
   try {
     const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbygwPT6tH0rh2U_6T4f9EF0nnhALZWd0cRiiDnYQc6uGnnyAOttHyF-hk6rQNdS5Ab7/exec",
+      "https://script.google.com/macros/s/AKfycbyYsgGNb3t_VO0GCSAovbYKX4Lp1hwlMJG_DNS5Jc1AYa82bhLRWCGj4Bbqphuruw1Y/exec",
       {
         action: action,
       }
