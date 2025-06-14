@@ -1,10 +1,11 @@
 const express = require('express');
-const { readSheet, updateSheetRow } = require('../services/sheetsService'); // <-- we'll add updateSheetRow
+const { readSheet, updateSheetRow, writeToSheet } = require('../services/sheetsService');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
 const fs = require('fs');
+const { generateCompleteApiKey } = require('../utils/apiKeyGenerator');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -329,6 +330,169 @@ router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
         }
         console.error('Avatar upload error:', error.message);
         return res.status(500).json({ error: 'Server error during avatar upload' });
+    }
+});
+
+// API Key Management Endpoints
+
+// Create a new API key
+router.post('/api-keys', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ 
+            error: 'Authentication required.',
+            requiresReauth: true
+        });
+    }
+
+    try {
+        // Verify the token and get user info
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // Check if user has admin role
+        if (decoded.role !== 'admin') {
+            return res.status(403).json({ 
+                error: 'Only administrators can create API keys' 
+            });
+        }
+
+        const { name, role, expiry_date, allowed_sheets } = req.body;
+
+        // Validate required fields
+        if (!name || !role) {
+            return res.status(400).json({ 
+                error: 'Name and role are required' 
+            });
+        }
+
+        // Generate API key
+        const apiKey = generateCompleteApiKey(role);
+
+        // Create API key record
+        const apiKeyData = {
+            api_key: apiKey,
+            name,
+            role,
+            status: 'active',
+            expiry_date: expiry_date || null,
+            allowed_sheets: allowed_sheets || '',
+            created_by: decoded.email,
+            created_at: new Date().toISOString()
+        };
+
+        // Write to api_keys sheet
+        await writeToSheet('api_keys', Object.values(apiKeyData));
+
+        res.status(201).json({
+            message: 'API key created successfully',
+            apiKey: apiKey,
+            data: apiKeyData
+        });
+    } catch (error) {
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ 
+                error: 'Invalid authentication token.',
+                requiresReauth: true
+            });
+        }
+        console.error('API key creation error:', error);
+        res.status(500).json({ error: 'Failed to create API key' });
+    }
+});
+
+// List all API keys
+router.get('/api-keys', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ 
+            error: 'Authentication required.',
+            requiresReauth: true
+        });
+    }
+
+    try {
+        // Verify the token and get user info
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // Check if user has admin role
+        if (decoded.role !== 'admin') {
+            return res.status(403).json({ 
+                error: 'Only administrators can view API keys' 
+            });
+        }
+
+        const apiKeys = await readSheet('api_keys');
+        
+        // Remove the actual API key from the response for security
+        const sanitizedKeys = apiKeys.map(key => ({
+            name: key.name,
+            role: key.role,
+            status: key.status,
+            expiry_date: key.expiry_date,
+            allowed_sheets: key.allowed_sheets,
+            created_by: key.created_by,
+            created_at: key.created_at
+        }));
+
+        res.json(sanitizedKeys);
+    } catch (error) {
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ 
+                error: 'Invalid authentication token.',
+                requiresReauth: true
+            });
+        }
+        console.error('API key listing error:', error);
+        res.status(500).json({ error: 'Failed to list API keys' });
+    }
+});
+
+// Deactivate an API key
+router.put('/api-keys/:apiKey/deactivate', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ 
+            error: 'Authentication required.',
+            requiresReauth: true
+        });
+    }
+
+    try {
+        // Verify the token and get user info
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // Check if user has admin role
+        if (decoded.role !== 'admin') {
+            return res.status(403).json({ 
+                error: 'Only administrators can deactivate API keys' 
+            });
+        }
+
+        const { apiKey } = req.params;
+        const apiKeys = await readSheet('api_keys');
+        
+        const keyIndex = apiKeys.findIndex(k => k.api_key === apiKey);
+        if (keyIndex === -1) {
+            return res.status(404).json({ error: 'API key not found' });
+        }
+
+        // Update status to inactive
+        apiKeys[keyIndex].status = 'inactive';
+        await updateSheetRow('api_keys', keyIndex + 2, apiKeys[keyIndex]);
+
+        res.json({ message: 'API key deactivated successfully' });
+    } catch (error) {
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ 
+                error: 'Invalid authentication token.',
+                requiresReauth: true
+            });
+        }
+        console.error('API key deactivation error:', error);
+        res.status(500).json({ error: 'Failed to deactivate API key' });
     }
 });
 

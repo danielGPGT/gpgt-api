@@ -1,10 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const sheetRoutes = require('./routes/sheets');
-const authRoutes = require('./routes/auth'); // <-- Add this
+const authRoutes = require('./routes/auth');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
+const { apiKeyAuth } = require('./middleware/apiKeyAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,9 +19,12 @@ app.use(cors({
     credentials: true
 }));
 
-// Routes
-app.use('/api/v1', authRoutes); // <-- Mount auth first
-app.use('/api/v1', sheetRoutes); // <-- Mount sheets after
+// Public routes (no auth required)
+app.use('/api/v1/login', authRoutes);
+
+// Protected routes (require API key)
+app.use('/api/v1', apiKeyAuth(), authRoutes); // Apply API key auth to auth routes
+app.use('/api/v1', apiKeyAuth(), sheetRoutes); // Apply API key auth to sheet routes
 
 // Global error handler
 app.use((err, req, res, next) => {

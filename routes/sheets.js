@@ -3,6 +3,7 @@ const { readSheet, writeToSheet } = require("../services/sheetsService");
 const { google } = require("googleapis");
 const path = require("path");
 const axios = require("axios");
+const { checkSheetAccess } = require('../middleware/apiKeyAuth');
 const router = express.Router();
 
 // Function to get Google auth credentials
@@ -148,7 +149,7 @@ function columnIndexToLetter(index) {
 const pendingUpdates = new Map();
 
 // GET route for getting a single booking by ID (more specific route)
-router.get("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
+router.get("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
 
   try {
@@ -175,7 +176,7 @@ router.get("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
 });
 
 // GET route to fetch data for a specific sheet (more general route)
-router.get("/:sheetName", async (req, res, next) => {
+router.get("/:sheetName", checkSheetAccess(), async (req, res, next) => {
   const { sheetName } = req.params;
   const {
     sport,
@@ -287,7 +288,7 @@ router.get("/:sheetName", async (req, res, next) => {
 });
 
 // POST route to write data to a specific sheet
-router.post("/:sheetName", async (req, res, next) => {
+router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
   const { sheetName } = req.params;
   console.log("Writing to sheet:", sheetName);
   console.log("Request body:", req.body);
@@ -344,7 +345,7 @@ router.post("/:sheetName", async (req, res, next) => {
 });
 
 // PUT route to update a single cell in a specific sheet
-router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
+router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
   
   // Validate URL parameters
@@ -445,7 +446,7 @@ router.put("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
 });
 
 // Add new bulk update endpoint
-router.put("/:sheetName/:idColumn/:idValue/bulk", async (req, res, next) => {
+router.put("/:sheetName/:idColumn/:idValue/bulk", checkSheetAccess(), async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
   
   // Validate URL parameters
@@ -517,7 +518,7 @@ router.put("/:sheetName/:idColumn/:idValue/bulk", async (req, res, next) => {
 });
 
 // DELETE route to remove data from a specific sheet
-router.delete("/:sheetName/:idColumn/:idValue", async (req, res, next) => {
+router.delete("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
 
   try {
