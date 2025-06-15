@@ -4,7 +4,6 @@ const { google } = require("googleapis");
 const path = require("path");
 const axios = require("axios");
 const { checkSheetAccess } = require('../middleware/apiKeyAuth');
-const { cacheService } = require('../services/cacheService');
 const router = express.Router();
 
 // Function to get Google auth credentials
@@ -148,20 +147,20 @@ function columnIndexToLetter(index) {
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
-// GET route for getting a single booking by ID
+// GET route for getting a single booking by ID (more specific route)
 router.get("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
 
   try {
-    const booking = await cacheService.getSheetRow(
-      sheetName,
-      idColumn,
-      idValue,
-      async () => {
-        const data = await readSheet(sheetName);
-        return data.find(item => item[idColumn] === idValue);
-      }
-    );
+    const data = await readSheet(sheetName);
+    if (!data) {
+      return res
+        .status(404)
+        .json({ error: `No data found in sheet: ${sheetName}` });
+    }
+
+    // Find the booking with matching ID
+    const booking = data.find(item => item[idColumn] === idValue);
     
     if (!booking) {
       return res
@@ -175,16 +174,24 @@ router.get("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res
   }
 });
 
-// GET route to fetch data for a specific sheet
+// GET route to fetch data for a specific sheet (more general route)
 router.get("/:sheetName", checkSheetAccess(), async (req, res, next) => {
   const { sheetName } = req.params;
-  const queryParams = req.query;
+  const {
+    sport,
+    eventId,
+    ticketId,
+    packageId,
+    hotelId,
+    roomId,
+    airportTransferId,
+    circuitTransferId,
+    loungePassId,
+    packageType,
+  } = req.query;
 
   try {
-    const data = await cacheService.getSheetData(sheetName, async () => {
-      return await readSheet(sheetName);
-    });
-
+    const data = await readSheet(sheetName);
     if (!data) {
       return res
         .status(404)
@@ -254,18 +261,20 @@ router.get("/:sheetName", checkSheetAccess(), async (req, res, next) => {
 
     // Apply filters dynamically
     for (const [queryKey, sheetColumn] of Object.entries(filters)) {
-      if (queryParams[queryKey]) {
+      if (req.query[queryKey]) {
+        // Special handling for fields that may contain multiple values
         if (queryKey === "packageId") {
           filteredData = filteredData.filter((item) => {
             const cell = item[sheetColumn];
             if (!cell) return false;
             const ids = cell.split(",").map((id) => id.trim());
-            return ids.includes(queryParams[queryKey]);
+            return ids.includes(req.query[queryKey]);
           });
         } else {
+          // Normal strict match for other fields
           filteredData = filteredData.filter(
             (item) =>
-              item[sheetColumn] && item[sheetColumn] === queryParams[queryKey]
+              item[sheetColumn] && item[sheetColumn] === req.query[queryKey]
           );
         }
       }
@@ -282,8 +291,8 @@ router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
     const { sheetName } = req.params;
 
     try {
-        // Get headers with caching
-        const headers = await cacheService.getSheetHeaders(sheetName, async () => {
+        // Get headers from cache
+        const headers = await getCachedData(`headers-${sheetName}`, async () => {
             const response = await sheets.spreadsheets.values.get({
                 spreadsheetId,
                 range: `${sheetName}!1:1`,
@@ -304,6 +313,7 @@ router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
                 }
             });
         } else {
+            // Map the incoming data to the correct positions based on headers
             for (const [field, value] of Object.entries(req.body)) {
                 const columnIndex = headers.indexOf(field);
                 if (columnIndex !== -1) {
@@ -312,14 +322,13 @@ router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
             }
         }
 
-        // Write data and clear cache in parallel
+        // Write data and trigger updates in parallel
         await Promise.all([
             writeToSheet(sheetName, rowData),
-            triggerRunAllUpdates(sheetName)
+            triggerRunAllUpdates(sheetName),
+            // Clear cache for this sheet
+            cache.headers.delete(`headers-${sheetName}`)
         ]);
-
-        // Clear all cache related to this sheet
-        cacheService.clearSheetCache(sheetName);
 
         res.status(200).json({ message: "Data successfully written to the sheet" });
     } catch (error) {
@@ -328,10 +337,9 @@ router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
     }
 });
 
-// PUT route to update a single cell
+// PUT route to update a single cell in a specific sheet
 router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
     const { sheetName, idColumn, idValue } = req.params;
-    const { column, value } = req.body;
     
     // Validate URL parameters
     if (!sheetName || typeof sheetName !== 'string') {
@@ -350,6 +358,8 @@ router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res
     if (!req.body || typeof req.body !== 'object') {
         return res.status(400).json({ error: "Request body is required and must be an object" });
     }
+    
+    const { column, value } = req.body;
     
     // Validate required fields
     if (!column || typeof column !== 'string') {
@@ -380,8 +390,8 @@ router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res
     pendingUpdates.set(updateKey, true);
 
     try {
-        // Get headers with caching
-        const headers = await cacheService.getSheetHeaders(sheetName, async () => {
+        // Get headers from cache
+        const headers = await getCachedData(`headers-${sheetName}`, async () => {
             const response = await sheets.spreadsheets.values.get({
                 spreadsheetId,
                 range: `'${sheetName}'!A1:ZZ1`,
@@ -412,10 +422,11 @@ router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res
             value: processedValue
         }]);
 
-        // Execute updates and clear cache in parallel
+        // Trigger updates in parallel
         await Promise.all([
             triggerRunAllUpdates(sheetName),
-            cacheService.clearSheetCache(sheetName)
+            // Clear cache for this sheet
+            cache.headers.delete(`headers-${sheetName}`)
         ]);
 
         res.json({ message: "Cell updated successfully" });
@@ -450,8 +461,8 @@ router.put("/:sheetName/:idColumn/:idValue/bulk", checkSheetAccess(), async (req
   }
 
   try {
-    // Get headers with caching
-    const headers = await cacheService.getSheetHeaders(sheetName, async () => {
+    // Get headers from cache
+    const headers = await getCachedData(`headers-${sheetName}`, async () => {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range: `'${sheetName}'!A1:ZZ1`,
@@ -485,10 +496,11 @@ router.put("/:sheetName/:idColumn/:idValue/bulk", checkSheetAccess(), async (req
     // Execute batch update
     await batchUpdate(sheetName, batchUpdates);
 
-    // Execute updates and clear cache in parallel
+    // Trigger updates in parallel
     await Promise.all([
       triggerRunAllUpdates(sheetName),
-      cacheService.clearSheetCache(sheetName)
+      // Clear cache for this sheet
+      cache.headers.delete(`headers-${sheetName}`)
     ]);
 
     res.json({ message: "Bulk update completed successfully" });
@@ -519,30 +531,27 @@ router.delete("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, 
 
     const sheetId = sheetMetadata.data.sheets[0].properties.sheetId;
 
-    // Execute delete and clear cache in parallel
-    await Promise.all([
-      sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [
-            {
-              deleteDimension: {
-                range: {
-                  sheetId: sheetId,
-                  dimension: "ROWS",
-                  startIndex: rowNumber - 1,
-                  endIndex: rowNumber,
-                },
+    // Delete the row
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: sheetId,
+                dimension: "ROWS",
+                startIndex: rowNumber - 1,
+                endIndex: rowNumber,
               },
             },
-          ],
-        },
-      }),
-      triggerRunAllUpdates(sheetName)
-    ]);
+          },
+        ],
+      },
+    });
 
-    // Clear all cache related to this sheet
-    cacheService.clearSheetCache(sheetName);
+    // Trigger appropriate Google Apps Script updates
+    await triggerRunAllUpdates(sheetName);
 
     res.json({ message: "Item deleted successfully" });
   } catch (error) {
