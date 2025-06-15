@@ -114,14 +114,16 @@ async function writeToSheet(sheetName, data) {
     const sheets = google.sheets({ version: 'v4', auth });
     try {
         // Convert empty strings to null
-        const processedData = data.map(value => value === '' ? null : value);
+        const processedData = Array.isArray(data[0]) 
+            ? data.map(row => row.map(value => value === '' ? null : value))
+            : [data.map(value => value === '' ? null : value)];
         
         await sheets.spreadsheets.values.append({
             spreadsheetId,
             range: sheetName,
             valueInputOption: 'RAW',
             requestBody: {
-                values: [processedData], // Add the row as a single array
+                values: processedData, // Now handles both single and multiple rows
             },
         });
         console.log(`Data written to sheet "${sheetName}" successfully.`);

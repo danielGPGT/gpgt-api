@@ -2,10 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const sheetRoutes = require('./routes/sheets');
 const authRoutes = require('./routes/auth');
+const notificationRoutes = require('./routes/notifications');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
 const { apiKeyAuth } = require('./middleware/apiKeyAuth');
+const jwtAuth = require('./middleware/jwtAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +27,9 @@ app.use('/api/v1/login', authRoutes);
 // Protected routes (require API key)
 app.use('/api/v1', apiKeyAuth(), authRoutes); // Apply API key auth to auth routes
 app.use('/api/v1', apiKeyAuth(), sheetRoutes); // Apply API key auth to sheet routes
+
+// Notifications routes (require both API key and JWT)
+app.use('/api/v1/notifications', apiKeyAuth(), jwtAuth(), notificationRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
