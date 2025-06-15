@@ -6,6 +6,42 @@ const axios = require("axios");
 const { checkSheetAccess } = require('../middleware/apiKeyAuth');
 const router = express.Router();
 
+// Global cache configuration
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const globalCache = new Map();
+
+// Helper function to get cached data
+async function getCachedData(key, fetchFn) {
+  const now = Date.now();
+  const cached = globalCache.get(key);
+  
+  if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+    return cached.data;
+  }
+  
+  const data = await fetchFn();
+  globalCache.set(key, {
+    data,
+    timestamp: now
+  });
+  return data;
+}
+
+// Helper function to clear cache
+function clearCache(pattern = null) {
+  if (pattern) {
+    // Clear specific cache entries matching the pattern
+    for (const key of globalCache.keys()) {
+      if (key.includes(pattern)) {
+        globalCache.delete(key);
+      }
+    }
+  } else {
+    // Clear entire cache
+    globalCache.clear();
+  }
+}
+
 // Function to get Google auth credentials
 function getGoogleAuth() {
     // First try to get credentials from environment variable (Render)
@@ -40,28 +76,6 @@ const spreadsheetId = process.env.SPREADSHEET_ID;
 
 if (!spreadsheetId) {
     throw new Error('SPREADSHEET_ID environment variable is required');
-}
-
-// Add caching
-const cache = {
-    headers: new Map(),
-    lastUpdated: new Map(),
-    CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
-};
-
-// Helper function to get cached data
-async function getCachedData(key, fetchFn) {
-  const now = Date.now();
-  const cached = cache[key];
-  
-  if (cached && (now - cache.lastUpdated.get(key)) < cache.CACHE_DURATION) {
-    return cached;
-  }
-  
-  const data = await fetchFn();
-  cache[key] = data;
-  cache.lastUpdated.set(key, now);
-  return data;
 }
 
 // Optimize Google Sheets API calls
@@ -325,10 +339,11 @@ router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
         // Write data and trigger updates in parallel
         await Promise.all([
             writeToSheet(sheetName, rowData),
-            triggerRunAllUpdates(sheetName),
-            // Clear cache for this sheet
-            cache.headers.delete(`headers-${sheetName}`)
+            triggerRunAllUpdates(sheetName)
         ]);
+
+        // Clear all cache entries for this sheet
+        clearCache(sheetName);
 
         res.status(200).json({ message: "Data successfully written to the sheet" });
     } catch (error) {
@@ -422,11 +437,10 @@ router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res
             value: processedValue
         }]);
 
-        // Trigger updates in parallel
+        // Trigger updates and clear cache in parallel
         await Promise.all([
             triggerRunAllUpdates(sheetName),
-            // Clear cache for this sheet
-            cache.headers.delete(`headers-${sheetName}`)
+            clearCache(sheetName)
         ]);
 
         res.json({ message: "Cell updated successfully" });
@@ -496,11 +510,10 @@ router.put("/:sheetName/:idColumn/:idValue/bulk", checkSheetAccess(), async (req
     // Execute batch update
     await batchUpdate(sheetName, batchUpdates);
 
-    // Trigger updates in parallel
+    // Trigger updates and clear cache in parallel
     await Promise.all([
       triggerRunAllUpdates(sheetName),
-      // Clear cache for this sheet
-      cache.headers.delete(`headers-${sheetName}`)
+      clearCache(sheetName)
     ]);
 
     res.json({ message: "Bulk update completed successfully" });
@@ -550,8 +563,11 @@ router.delete("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, 
       },
     });
 
-    // Trigger appropriate Google Apps Script updates
-    await triggerRunAllUpdates(sheetName);
+    // Trigger updates and clear cache in parallel
+    await Promise.all([
+      triggerRunAllUpdates(sheetName),
+      clearCache(sheetName)
+    ]);
 
     res.json({ message: "Item deleted successfully" });
   } catch (error) {
