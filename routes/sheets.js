@@ -4,6 +4,7 @@ const { google } = require("googleapis");
 const path = require("path");
 const axios = require("axios");
 const { checkSheetAccess } = require('../middleware/apiKeyAuth');
+const { cacheService } = require('../services/cacheService');
 const router = express.Router();
 
 // Function to get Google auth credentials
@@ -107,32 +108,31 @@ async function findRowById(sheets, sheetName, idColumn, idValue) {
 
 // Helper function to trigger Google Apps Script updates
 async function triggerRunAllUpdates(sheetName) {
-  const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
-  let action;
+    const normalizedSheetName = sheetName.toLowerCase().replace(/\s+/g, "");
+    let action;
 
-  // Determine the action based on the sheet name
-  switch (normalizedSheetName) {
-    case "stock-tickets":
-      action = "updateTickets";
-      break;
-    case "bookingfile":
-      action = "runAllUpdates";
-      break;
-    default:
-      action = "";
-  }
+    // Determine the action based on the sheet name
+    switch (normalizedSheetName) {
+        case "stock-tickets":
+            action = "updateTickets";
+            break;
+        case "bookingfile":
+            action = "runAllUpdates";
+            break;
+        default:
+            action = "";
+    }
 
-  try {
-    const response = await axios.post(
-      "https://script.google.com/macros/s/AKfycbz1T0Pc78gUjCU6aZbG9ROfVSl09Bu--U8bBeP6Y2DNaOqmTcTMYCja3_iqGHl3msvz/exec",
-      {
-        action: action,
-      }
-    );
-    console.log(`${action} triggered:`, response.data);
-  } catch (error) {
-    console.error(`Error triggering ${action || 'update'}:`, error.message);
-  }
+    try {
+        await axios.post(
+            "https://script.google.com/macros/s/AKfycbz1T0Pc78gUjCU6aZbG9ROfVSl09Bu--U8bBeP6Y2DNaOqmTcTMYCja3_iqGHl3msvz/exec",
+            {
+                action: action,
+            }
+        );
+    } catch (error) {
+        console.error(`Error triggering ${action || 'update'}:`, error.message);
+    }
 }
 
 // Helper function to convert column index to letter (0 = A, 1 = B, 26 = AA, etc.)
@@ -148,20 +148,20 @@ function columnIndexToLetter(index) {
 // Add at the top of the file with other constants
 const pendingUpdates = new Map();
 
-// GET route for getting a single booking by ID (more specific route)
+// GET route for getting a single booking by ID
 router.get("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
   const { sheetName, idColumn, idValue } = req.params;
 
   try {
-    const data = await readSheet(sheetName);
-    if (!data) {
-      return res
-        .status(404)
-        .json({ error: `No data found in sheet: ${sheetName}` });
-    }
-
-    // Find the booking with matching ID
-    const booking = data.find(item => item[idColumn] === idValue);
+    const booking = await cacheService.getSheetRow(
+      sheetName,
+      idColumn,
+      idValue,
+      async () => {
+        const data = await readSheet(sheetName);
+        return data.find(item => item[idColumn] === idValue);
+      }
+    );
     
     if (!booking) {
       return res
@@ -175,24 +175,16 @@ router.get("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res
   }
 });
 
-// GET route to fetch data for a specific sheet (more general route)
+// GET route to fetch data for a specific sheet
 router.get("/:sheetName", checkSheetAccess(), async (req, res, next) => {
   const { sheetName } = req.params;
-  const {
-    sport,
-    eventId,
-    ticketId,
-    packageId,
-    hotelId,
-    roomId,
-    airportTransferId,
-    circuitTransferId,
-    loungePassId,
-    packageType,
-  } = req.query;
+  const queryParams = req.query;
 
   try {
-    const data = await readSheet(sheetName);
+    const data = await cacheService.getSheetData(sheetName, async () => {
+      return await readSheet(sheetName);
+    });
+
     if (!data) {
       return res
         .status(404)
@@ -262,20 +254,18 @@ router.get("/:sheetName", checkSheetAccess(), async (req, res, next) => {
 
     // Apply filters dynamically
     for (const [queryKey, sheetColumn] of Object.entries(filters)) {
-      if (req.query[queryKey]) {
-        // Special handling for fields that may contain multiple values
+      if (queryParams[queryKey]) {
         if (queryKey === "packageId") {
           filteredData = filteredData.filter((item) => {
             const cell = item[sheetColumn];
             if (!cell) return false;
             const ids = cell.split(",").map((id) => id.trim());
-            return ids.includes(req.query[queryKey]);
+            return ids.includes(queryParams[queryKey]);
           });
         } else {
-          // Normal strict match for other fields
           filteredData = filteredData.filter(
             (item) =>
-              item[sheetColumn] && item[sheetColumn] === req.query[queryKey]
+              item[sheetColumn] && item[sheetColumn] === queryParams[queryKey]
           );
         }
       }
@@ -289,160 +279,152 @@ router.get("/:sheetName", checkSheetAccess(), async (req, res, next) => {
 
 // POST route to write data to a specific sheet
 router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
-  const { sheetName } = req.params;
-  console.log("Writing to sheet:", sheetName);
-  console.log("Request body:", req.body);
+    const { sheetName } = req.params;
 
-  try {
-    // Get headers from cache
-    const headers = await getCachedData(`headers-${sheetName}`, async () => {
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `${sheetName}!1:1`,
-      });
-      return response.data.values[0];
-    });
+    try {
+        // Get headers with caching
+        const headers = await cacheService.getSheetHeaders(sheetName, async () => {
+            const response = await sheets.spreadsheets.values.get({
+                spreadsheetId,
+                range: `${sheetName}!1:1`,
+            });
+            return response.data.values[0];
+        });
 
-    if (!headers) {
-      return res.status(400).json({ error: "No headers found in the sheet" });
-    }
-
-    const rowData = new Array(headers.length).fill("");
-
-    if (Array.isArray(req.body)) {
-      req.body.forEach((value, index) => {
-        if (index < headers.length) {
-          rowData[index] = value;
+        if (!headers) {
+            return res.status(400).json({ error: "No headers found in the sheet" });
         }
-      });
-    } else {
-      // Map the incoming data to the correct positions based on headers
-      for (const [field, value] of Object.entries(req.body)) {
-        const columnIndex = headers.indexOf(field);
-          if (columnIndex !== -1) {
-            rowData[columnIndex] = value;
+
+        const rowData = new Array(headers.length).fill("");
+
+        if (Array.isArray(req.body)) {
+            req.body.forEach((value, index) => {
+                if (index < headers.length) {
+                    rowData[index] = value;
+                }
+            });
         } else {
-          console.log(`Column ${field} not found in headers`);
+            for (const [field, value] of Object.entries(req.body)) {
+                const columnIndex = headers.indexOf(field);
+                if (columnIndex !== -1) {
+                    rowData[columnIndex] = value;
+                }
+            }
         }
-      }
+
+        // Write data and clear cache in parallel
+        await Promise.all([
+            writeToSheet(sheetName, rowData),
+            triggerRunAllUpdates(sheetName)
+        ]);
+
+        // Clear all cache related to this sheet
+        cacheService.clearSheetCache(sheetName);
+
+        res.status(200).json({ message: "Data successfully written to the sheet" });
+    } catch (error) {
+        console.error("Error writing to sheet:", error.message);
+        next(error);
     }
-
-    console.log("Row data to write:", rowData);
-
-    // Write data and trigger updates in parallel
-    await Promise.all([
-      writeToSheet(sheetName, rowData),
-      triggerRunAllUpdates(sheetName),
-      // Clear cache for this sheet
-      cache.headers.delete(`headers-${sheetName}`)
-    ]);
-
-    res.status(200).json({ message: "Data successfully written to the sheet" });
-  } catch (error) {
-    console.error("Error writing to sheet:", error.message);
-    next(error);
-  }
 });
 
-// PUT route to update a single cell in a specific sheet
+// PUT route to update a single cell
 router.put("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, res, next) => {
-  const { sheetName, idColumn, idValue } = req.params;
-  
-  // Validate URL parameters
-  if (!sheetName || typeof sheetName !== 'string') {
-    return res.status(400).json({ error: "Valid sheet name is required" });
-  }
-  
-  if (!idColumn || typeof idColumn !== 'string') {
-    return res.status(400).json({ error: "Valid ID column name is required" });
-  }
-  
-  if (!idValue || typeof idValue !== 'string') {
-    return res.status(400).json({ error: "Valid ID value is required" });
-  }
-  
-  // Validate request body
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({ error: "Request body is required and must be an object" });
-  }
-  
-  const { column, value } = req.body;
-  
-  // Validate required fields
-  if (!column || typeof column !== 'string') {
-    return res.status(400).json({ error: "Column name is required and must be a string" });
-  }
-
-  // Validate value (can be null, string, number, or boolean)
-  if (value !== null && value !== undefined && 
-      typeof value !== 'string' && 
-      typeof value !== 'number' && 
-      typeof value !== 'boolean') {
-    return res.status(400).json({ 
-      error: "Value must be a string, number, boolean, or null" 
-    });
-  }
-
-  // Convert empty string to null
-  const processedValue = value === "" ? null : value;
-
-  const updateKey = `${sheetName}-${idValue}-${column}`;
-  if (pendingUpdates.has(updateKey)) {
-    return res.status(409).json({
-      error: "Update already in progress",
-      message: "This update is already being processed",
-    });
-  }
-
-  pendingUpdates.set(updateKey, true);
-
-  try {
-    // Get headers from cache
-    const headers = await getCachedData(`headers-${sheetName}`, async () => {
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `'${sheetName}'!A1:ZZ1`,
-      });
-      return response.data.values[0];
-    });
-
-    // Find row number
-    const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
-    if (!rowNumber) {
-      pendingUpdates.delete(updateKey);
-      return res.status(404).json({ error: "Item not found" });
-    }
-
-    const columnIndex = headers.indexOf(column);
-    if (columnIndex === -1) {
-      pendingUpdates.delete(updateKey);
-      return res.status(400).json({
-        error: `Column '${column}' not found in sheet. Available columns: ${headers.join(", ")}`,
-      });
-    }
-
-    const columnLetter = columnIndexToLetter(columnIndex);
+    const { sheetName, idColumn, idValue } = req.params;
+    const { column, value } = req.body;
     
-    // Use batch update with processed value
-    await batchUpdate(sheetName, [{
-      range: `${columnLetter}${rowNumber}`,
-      value: processedValue
-    }]);
+    // Validate URL parameters
+    if (!sheetName || typeof sheetName !== 'string') {
+        return res.status(400).json({ error: "Valid sheet name is required" });
+    }
+    
+    if (!idColumn || typeof idColumn !== 'string') {
+        return res.status(400).json({ error: "Valid ID column name is required" });
+    }
+    
+    if (!idValue || typeof idValue !== 'string') {
+        return res.status(400).json({ error: "Valid ID value is required" });
+    }
+    
+    // Validate request body
+    if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ error: "Request body is required and must be an object" });
+    }
+    
+    // Validate required fields
+    if (!column || typeof column !== 'string') {
+        return res.status(400).json({ error: "Column name is required and must be a string" });
+    }
 
-    // Trigger updates in parallel
-    await Promise.all([
-      triggerRunAllUpdates(sheetName),
-      // Clear cache for this sheet
-      cache.headers.delete(`headers-${sheetName}`)
-    ]);
+    // Validate value (can be null, string, number, or boolean)
+    if (value !== null && value !== undefined && 
+        typeof value !== 'string' && 
+        typeof value !== 'number' && 
+        typeof value !== 'boolean') {
+        return res.status(400).json({ 
+            error: "Value must be a string, number, boolean, or null" 
+        });
+    }
 
-    res.json({ message: "Cell updated successfully" });
-  } catch (error) {
-    console.error("Error updating cell:", error);
-    next(error);
-  } finally {
-    pendingUpdates.delete(updateKey);
-  }
+    // Convert empty string to null
+    const processedValue = value === "" ? null : value;
+
+    const updateKey = `${sheetName}-${idValue}-${column}`;
+    if (pendingUpdates.has(updateKey)) {
+        return res.status(409).json({
+            error: "Update already in progress",
+            message: "This update is already being processed",
+        });
+    }
+
+    pendingUpdates.set(updateKey, true);
+
+    try {
+        // Get headers with caching
+        const headers = await cacheService.getSheetHeaders(sheetName, async () => {
+            const response = await sheets.spreadsheets.values.get({
+                spreadsheetId,
+                range: `'${sheetName}'!A1:ZZ1`,
+            });
+            return response.data.values[0];
+        });
+
+        // Find row number
+        const rowNumber = await findRowById(sheets, sheetName, idColumn, idValue);
+        if (!rowNumber) {
+            pendingUpdates.delete(updateKey);
+            return res.status(404).json({ error: "Item not found" });
+        }
+
+        const columnIndex = headers.indexOf(column);
+        if (columnIndex === -1) {
+            pendingUpdates.delete(updateKey);
+            return res.status(400).json({
+                error: `Column '${column}' not found in sheet. Available columns: ${headers.join(", ")}`,
+            });
+        }
+
+        const columnLetter = columnIndexToLetter(columnIndex);
+        
+        // Use batch update with processed value
+        await batchUpdate(sheetName, [{
+            range: `${columnLetter}${rowNumber}`,
+            value: processedValue
+        }]);
+
+        // Execute updates and clear cache in parallel
+        await Promise.all([
+            triggerRunAllUpdates(sheetName),
+            cacheService.clearSheetCache(sheetName)
+        ]);
+
+        res.json({ message: "Cell updated successfully" });
+    } catch (error) {
+        console.error("Error updating cell:", error);
+        next(error);
+    } finally {
+        pendingUpdates.delete(updateKey);
+    }
 });
 
 // Add new bulk update endpoint
@@ -468,8 +450,8 @@ router.put("/:sheetName/:idColumn/:idValue/bulk", checkSheetAccess(), async (req
   }
 
   try {
-    // Get headers from cache
-    const headers = await getCachedData(`headers-${sheetName}`, async () => {
+    // Get headers with caching
+    const headers = await cacheService.getSheetHeaders(sheetName, async () => {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range: `'${sheetName}'!A1:ZZ1`,
@@ -503,11 +485,10 @@ router.put("/:sheetName/:idColumn/:idValue/bulk", checkSheetAccess(), async (req
     // Execute batch update
     await batchUpdate(sheetName, batchUpdates);
 
-    // Trigger updates in parallel
+    // Execute updates and clear cache in parallel
     await Promise.all([
       triggerRunAllUpdates(sheetName),
-      // Clear cache for this sheet
-      cache.headers.delete(`headers-${sheetName}`)
+      cacheService.clearSheetCache(sheetName)
     ]);
 
     res.json({ message: "Bulk update completed successfully" });
@@ -538,27 +519,30 @@ router.delete("/:sheetName/:idColumn/:idValue", checkSheetAccess(), async (req, 
 
     const sheetId = sheetMetadata.data.sheets[0].properties.sheetId;
 
-    // Delete the row
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId: sheetId,
-                dimension: "ROWS",
-                startIndex: rowNumber - 1,
-                endIndex: rowNumber,
+    // Execute delete and clear cache in parallel
+    await Promise.all([
+      sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId: sheetId,
+                  dimension: "ROWS",
+                  startIndex: rowNumber - 1,
+                  endIndex: rowNumber,
+                },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      }),
+      triggerRunAllUpdates(sheetName)
+    ]);
 
-    // Trigger appropriate Google Apps Script updates
-    await triggerRunAllUpdates(sheetName);
+    // Clear all cache related to this sheet
+    cacheService.clearSheetCache(sheetName);
 
     res.json({ message: "Item deleted successfully" });
   } catch (error) {
