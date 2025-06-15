@@ -7,46 +7,67 @@ const { checkSheetAccess } = require('../middleware/apiKeyAuth');
 const Redis = require('ioredis');
 const router = express.Router();
 
-// Redis cache configuration
+// Cache configuration
 const CACHE_DURATION = 5 * 60; // 5 minutes in seconds
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+// Configure Redis with connection string
+const redis = new Redis(process.env.REDIS_URL, {
+    retryStrategy: function(times) {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+    },
+    maxRetriesPerRequest: 3
+});
+
+// Handle Redis connection events
+redis.on('connect', () => {
+    console.log('Successfully connected to Redis');
+});
+
+redis.on('error', (error) => {
+    console.error('Redis connection error:', error);
+});
+
+redis.on('ready', () => {
+    console.log('Redis client is ready');
+});
 
 // Helper function to get cached data
 async function getCachedData(key, fetchFn) {
-  try {
-    // Try to get from cache
-    const cached = await redis.get(key);
-    if (cached) {
-      return JSON.parse(cached);
+    try {
+        // Try to get from cache
+        const cached = await redis.get(key);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+        
+        // If not in cache, fetch and store
+        const data = await fetchFn();
+        await redis.setex(key, CACHE_DURATION, JSON.stringify(data));
+        return data;
+    } catch (error) {
+        console.error('Redis error:', error);
+        // Fallback to direct fetch if Redis fails
+        return fetchFn();
     }
-    
-    // If not in cache, fetch and store
-    const data = await fetchFn();
-    await redis.setex(key, CACHE_DURATION, JSON.stringify(data));
-    return data;
-  } catch (error) {
-    console.error('Redis error:', error);
-    // Fallback to direct fetch if Redis fails
-    return fetchFn();
-  }
 }
 
 // Helper function to clear cache
 async function clearCache(pattern = null) {
-  try {
-    if (pattern) {
-      // Get all keys matching the pattern
-      const keys = await redis.keys(`*${pattern}*`);
-      if (keys.length > 0) {
-        await redis.del(keys);
-      }
-    } else {
-      // Clear entire cache
-      await redis.flushdb();
+    try {
+        if (pattern) {
+            // Get all keys matching the pattern
+            const keys = await redis.keys(`*${pattern}*`);
+            if (keys.length > 0) {
+                await redis.del(keys);
+            }
+        } else {
+            // Clear entire cache
+            await redis.flushdb();
+        }
+    } catch (error) {
+        console.error('Redis error:', error);
     }
-  } catch (error) {
-    console.error('Redis error:', error);
-  }
 }
 
 // Function to get Google auth credentials
