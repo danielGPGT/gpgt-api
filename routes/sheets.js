@@ -4,41 +4,48 @@ const { google } = require("googleapis");
 const path = require("path");
 const axios = require("axios");
 const { checkSheetAccess } = require('../middleware/apiKeyAuth');
+const Redis = require('ioredis');
 const router = express.Router();
 
-// Global cache configuration
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const globalCache = new Map();
+// Redis cache configuration
+const CACHE_DURATION = 5 * 60; // 5 minutes in seconds
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 // Helper function to get cached data
 async function getCachedData(key, fetchFn) {
-  const now = Date.now();
-  const cached = globalCache.get(key);
-  
-  if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-    return cached.data;
+  try {
+    // Try to get from cache
+    const cached = await redis.get(key);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    
+    // If not in cache, fetch and store
+    const data = await fetchFn();
+    await redis.setex(key, CACHE_DURATION, JSON.stringify(data));
+    return data;
+  } catch (error) {
+    console.error('Redis error:', error);
+    // Fallback to direct fetch if Redis fails
+    return fetchFn();
   }
-  
-  const data = await fetchFn();
-  globalCache.set(key, {
-    data,
-    timestamp: now
-  });
-  return data;
 }
 
 // Helper function to clear cache
-function clearCache(pattern = null) {
-  if (pattern) {
-    // Clear specific cache entries matching the pattern
-    for (const key of globalCache.keys()) {
-      if (key.includes(pattern)) {
-        globalCache.delete(key);
+async function clearCache(pattern = null) {
+  try {
+    if (pattern) {
+      // Get all keys matching the pattern
+      const keys = await redis.keys(`*${pattern}*`);
+      if (keys.length > 0) {
+        await redis.del(keys);
       }
+    } else {
+      // Clear entire cache
+      await redis.flushdb();
     }
-  } else {
-    // Clear entire cache
-    globalCache.clear();
+  } catch (error) {
+    console.error('Redis error:', error);
   }
 }
 
@@ -343,7 +350,7 @@ router.post("/:sheetName", checkSheetAccess(), async (req, res, next) => {
         ]);
 
         // Clear all cache entries for this sheet
-        clearCache(sheetName);
+        await clearCache(sheetName);
 
         res.status(200).json({ message: "Data successfully written to the sheet" });
     } catch (error) {
