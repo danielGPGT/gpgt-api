@@ -2,19 +2,23 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
+const apiKey = process.env.FLIGHT_API_KEY;
+const username = process.env.FLIGHT_API_USERNAME;
+const password = process.env.FLIGHT_API_PASSWORD;
+
 router.post('/token', async (req, res) => {
     try {
         const response = await axios({
             method: 'post',
             url: 'https://apiprod.travelinnovationgroup.com/Book/v7/Auth/Token',
             headers: {
-                'Ocp-Apim-Subscription-Key': 'd21d146f9a9943aead4bcae0e87d05c4',
+                'Ocp-Apim-Subscription-Key': apiKey,
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             data: new URLSearchParams({
                 'grant_type': 'password',
-                'Username': 'WHTU06161',
-                'Password': 'Sy8Des5Ra7@'
+                'Username': username,
+                'Password': password
             })
         });
 
@@ -45,7 +49,7 @@ router.post('/search-low-fares', async (req, res) => {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
-                'Ocp-Apim-Subscription-Key': 'd21d146f9a9943aead4bcae0e87d05c4'
+                'Ocp-Apim-Subscription-Key': apiKey
             },
             data: searchParams
         });
