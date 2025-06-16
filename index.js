@@ -3,6 +3,7 @@ const express = require('express');
 const sheetRoutes = require('./routes/sheets');
 const authRoutes = require('./routes/auth');
 const notificationRoutes = require('./routes/notifications');
+const flightRoutes = require('./routes/flight');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -23,6 +24,7 @@ app.use(cors({
 
 // Public routes (no auth required)
 app.use('/api/v1/login', authRoutes);
+app.use('/api/v1/flight', flightRoutes);
 
 // Protected routes (require API key)
 app.use('/api/v1', apiKeyAuth(), authRoutes); // Apply API key auth to auth routes
